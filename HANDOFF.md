@@ -11,6 +11,19 @@ You are restyling the UI of a small personal pizza-dough app. The math and stora
 - `src/engine/`, `src/data/`, `src/api.ts`. A check (`npm run guard`) fails the build if any of these change.
 - UI code imports only from `../api` (and its own `src/ui` files). Never import `src/engine` or `src/data` directly.
 
+## Files in the zip
+- `src/ui/`: yours to change.
+- `src/main.tsx`, `index.html`: small; you may touch the head tags and the CSS import only.
+- `reference-read-only/`: `api.ts`, `engine-types.ts`, `data-types.ts`, `package.json`. These show every function and data shape the UI can use. Do not return them; they are not used from the zip.
+- `screenshots/`: the current plain UI at phone width.
+
+## Rules
+- Keep every function call to `../api` exactly as it is: same function names, same arguments.
+- Keep every input, button and piece of information that is on screen today. You may move, group, collapse or restyle them, and improve wording on labels and buttons.
+- Keep any text that names a source (e.g. "FWSY p.220", "King Arthur", "PizzaBlab"). It can be smaller or tucked away, but it stays.
+- No new npm packages. Plain CSS (or CSS modules) and Google Fonts are fine. Inline SVG icons are fine.
+- Return complete files, not snippets.
+
 ## Screens (keep the flow, restyle freely)
 1. **Plan** (`PlanScreen.tsx`): dough picker, ball groups (count x grams, label), eat-at time, room temperature. A "Details" drawer holds mixer, ferment hours, fixed mix time, yeast override, hydration and salt, "Save as My Dough", and a style-thickness reference. Below: recipe, water temperature, timeline, and the big "Lock in & start" button.
 2. **Batch** (`BatchScreen.tsx`): after lock-in. "Rate a bake" form (chips), list of bakes from the batch, "what actually happened" form, the frozen recipe and timeline, calendar export.
