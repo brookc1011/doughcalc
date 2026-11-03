@@ -19,7 +19,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
 
   return (
     <div className="pad">
-      <h1>Bakes</h1>
+      <p className="eyebrow">Your pizza notebook</p><h1>Bakes</h1><p className="intro">A little better with every bake.</p>
 
       {latestTry && (
         <section className="card highlight">
@@ -35,10 +35,10 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
             <div key={h.doughId} className="session">
               <div className="row between">
                 <b>{h.name}</b>
-                <span>{h.avgOverall ? `${h.avgOverall.toFixed(1)}/5 avg` : ''}</span>
+                <span className="score">{h.avgOverall ? `${h.avgOverall.toFixed(1)}/5 avg` : ''}</span>
               </div>
               <div className="muted small">
-                {h.bakes} bakes {h.scores.length > 1 && <Spark values={h.scores} />}
+                {h.bakes} {h.bakes === 1 ? 'bake' : 'bakes'} {h.scores.length > 1 && <><Spark values={h.scores} /><span className="trend-caption">Oldest → newest · scores out of 5</span></>}
               </div>
               {h.bestBatchId && (
                 <button className="link small" onClick={() => go({ name: 'batch', id: h.bestBatchId! })}>
@@ -84,14 +84,14 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
 
 /** Tiny trend line of overall scores, oldest to newest. */
 function Spark({ values }: { values: number[] }) {
-  const w = 80;
-  const h = 18;
+  const w = 240;
+  const h = 44;
   const pts = values
     .map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - 1) / 4) * h}`)
     .join(' ');
   return (
-    <svg width={w} height={h} className="spark" aria-label="Score trend">
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" />
+    <svg viewBox={`-4 -4 ${w + 8} ${h + 8}`} className="spark" role="img" aria-label={`Scores, oldest to newest: ${values.join(', ')}. Out of 5.`}><title>Scores, oldest → newest · out of 5</title>
+      <polyline strokeLinejoin="round" strokeLinecap="round" points={pts} fill="none" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }

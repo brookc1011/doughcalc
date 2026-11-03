@@ -11,6 +11,8 @@ export function App() {
   const [route, setRoute] = useState<Route>({ name: 'plan' });
   const [settings, setSettings] = useState<Settings | null>(null);
 
+  useEffect(() => { window.scrollTo(0, 0); }, [route.name]);
+
   const reloadSettings = () => getSettings().then(setSettings);
 
   useEffect(() => {
@@ -35,17 +37,18 @@ export function App() {
           <BatchScreen id={route.id} settings={settings} go={setRoute} onSaved={reloadSettings} />
         )}
       </main>
-      <nav className="tabs">
-        <button className={route.name === 'plan' ? 'on' : ''} onClick={() => setRoute({ name: 'plan' })}>
+      <nav className="tabs" aria-label="Main navigation">
+        <button aria-current={route.name === 'plan' ? 'page' : undefined} className={route.name === 'plan' ? 'on' : ''} onClick={() => setRoute({ name: 'plan' })}>
           Plan
         </button>
         <button
+          aria-current={route.name === 'history' || route.name === 'batch' ? 'page' : undefined}
           className={route.name === 'history' || route.name === 'batch' ? 'on' : ''}
           onClick={() => setRoute({ name: 'history' })}
         >
           Bakes
         </button>
-        <button className={route.name === 'settings' ? 'on' : ''} onClick={() => setRoute({ name: 'settings' })}>
+        <button aria-current={route.name === 'settings' ? 'page' : undefined} className={route.name === 'settings' ? 'on' : ''} onClick={() => setRoute({ name: 'settings' })}>
           Settings
         </button>
       </nav>

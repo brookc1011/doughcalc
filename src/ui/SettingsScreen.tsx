@@ -17,7 +17,7 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
 
   return (
     <div className="pad">
-      <h1>Settings</h1>
+      <p className="eyebrow">Make yourself at home</p><h1>Settings</h1><p className="intro">Your kitchen, your defaults. Changes save as you go.</p>
 
       <section className="card">
         <label>
@@ -46,8 +46,7 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
         </label>
       </section>
 
-      <section className="card">
-        <h2>Water temperature</h2>
+      <details className="card"><summary>Water temperature</summary>
         <p className="muted small">
           Inside this room range the app shows the book's water temperature. Outside it, the app calculates water to hit the
           book's dough temperature.
@@ -73,7 +72,7 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
           </label>
         </div>
         <p className="muted small">Defaults are assumptions inside King Arthur's ranges: 0-4°F gentle folds, 22-24°F KitchenAid.</p>
-      </section>
+      </details>
 
       <section className="card">
         <h2>Ovens</h2>
@@ -88,7 +87,7 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
           </div>
         ))}
         <div className="row">
-          <input className="grow" placeholder="e.g. Oven + steel, 550°F, top rack" value={newOven} onChange={(e) => setNewOven(e.target.value)} />
+          <input aria-label="New oven name" className="grow" placeholder="e.g. Oven + steel, 550°F, top rack" value={newOven} onChange={(e) => setNewOven(e.target.value)} />
           <button
             className="small"
             disabled={!newOven}

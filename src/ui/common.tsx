@@ -14,8 +14,8 @@ type StepLike = { key: string; label: string; at: Date | string; detail: string 
 
 export function RecipeView({ recipe, yeast, water, unit }: { recipe: Recipe; yeast: Yeast; water: Water; unit: 'F' | 'C' }) {
   return (
-    <section className="card">
-      <h2>Recipe</h2>
+    <section className="card recipe-card">
+      <p className="eyebrow">Ready for the scales</p><h2>Recipe</h2>
       {recipe.parts.map((part) => (
         <div key={part.title}>
           {recipe.parts.length > 1 && <h3>{part.title}</h3>}
@@ -37,9 +37,9 @@ export function RecipeView({ recipe, yeast, water, unit }: { recipe: Recipe; yea
         {yeast.note}
       </p>
       {yeast.warning && <p className="warn">{yeast.warning}</p>}
-      <h3>Water</h3>
+      <h3 className="water-heading">Water temperature</h3>
       {water.map((w) => (
-        <p key={w.label}>
+        <p className="water-value" key={w.label}>
           <b>{w.label}:</b> {fmtTempRange(w.lowF, w.highF, unit)}{' '}
           <span className="muted small">{w.basis === 'calculated' ? w.note : ''}</span>
           {w.warning && <span className="warn"> {w.warning}</span>}
@@ -67,7 +67,7 @@ export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: st
                 + Google
               </a>
             </div>
-            <div>{fmtWhen(s.at)}</div>
+            <div className="step-time">{fmtWhen(s.at)}</div>
             <div className="muted small">{s.detail}</div>
           </li>
         ))}
@@ -119,7 +119,7 @@ export function Chips<T extends string>({
   return (
     <div className="chips">
       {options.map((o) => (
-        <button key={o.v} className={value === o.v ? 'chip on' : 'chip'} onClick={() => onChange(o.v)} type="button">
+        <button aria-pressed={value === o.v} key={o.v} className={value === o.v ? 'chip on' : 'chip'} onClick={() => onChange(o.v)} type="button">
           {o.label}
         </button>
       ))}

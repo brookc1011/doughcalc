@@ -104,9 +104,11 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
 
   return (
     <div className="pad">
+      <p className="eyebrow">A little planning. Great pizza.</p>
       <h1>Plan a bake</h1>
+      <p className="intro">Pick your dough. We’ll work back from dinner.</p>
 
-      <section className="card">
+      <section className="card plan-inputs">
         <label>
           Dough
           <select value={doughId} onChange={(e) => pickDough(e.target.value)}>
@@ -118,7 +120,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </select>
         </label>
 
-        <div className="label">Dough balls</div>
+        <div className="label">Dough balls <span className="field-hint">count × grams each</span></div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
             <input
@@ -137,20 +139,23 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
               aria-label="Grams each"
             />
             <span>g</span>
-            <input
-              className="grow"
-              value={b.label ?? ''}
-              placeholder="pizza"
-              onChange={(e) => setBall(i, { label: e.target.value })}
-              aria-label="Label"
-            />
             {balls.length > 1 && (
-              <button className="small" onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
+              <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
                 ✕
               </button>
             )}
           </div>
         ))}
+        <details className="size-options"><summary>Labels, sizes & diameter</summary>
+          {balls.map((b, i) => <label key={i}>Ball group {i + 1} label
+            <input
+              className="grow ball-label"
+              value={b.label ?? ''}
+              placeholder="pizza"
+              onChange={(e) => setBall(i, { label: e.target.value })}
+              aria-label="Label"
+            />
+</label>)}
         <div className="row">
           <button className="small" onClick={() => setBalls([...balls, { count: 1, grams: 200, label: 'focaccia' }])}>
             + another size
@@ -158,6 +163,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           <SizeHelper formula={formula} onPick={(g) => setBall(0, { grams: Math.round(g) })} />
         </div>
 
+        </details>
         <label>
           Eat at
           <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
@@ -168,8 +174,8 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         </label>
       </section>
 
-      <button className="link" onClick={() => setDetails(!details)}>
-        {details ? 'Hide details' : 'Details'}
+      <button className="details-toggle" aria-expanded={details} onClick={() => setDetails(!details)}>
+        {details ? '− Hide details' : '+ Details'}
       </button>
       {details && (
         <section className="card">
@@ -245,7 +251,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
       )}
 
       {plan.errors.map((e) => (
-        <p className="warn" key={e}>
+        <p className="warn" role="alert" key={e}>
           {e}
         </p>
       ))}
@@ -257,9 +263,9 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         onIcs={() => download('dough-plan.ics', planIcs(plan), 'text/calendar')}
       />
 
-      <button className="primary" disabled={plan.errors.length > 0 || saving} onClick={lock}>
-        Lock in & start
-      </button>
+      <div className="plan-action"><button className="primary" disabled={plan.errors.length > 0 || saving} onClick={lock}>
+        {saving ? 'Saving your batch…' : 'Lock in & start'}
+      </button></div>
     </div>
   );
 }

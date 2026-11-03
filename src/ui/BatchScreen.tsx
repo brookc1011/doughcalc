@@ -48,7 +48,7 @@ export function BatchScreen({
   };
 
   return (
-    <div className="pad">
+    <div className="pad batch-screen">
       <button className="link" onClick={() => go({ name: 'history' })}>
         ← Bakes
       </button>
@@ -56,7 +56,8 @@ export function BatchScreen({
       <p className="muted">Locked in {fmtWhen(batch.createdAt)}</p>
 
       {result && (
-        <section className="card highlight">
+        <section className="card highlight" role="status">
+          <p className="eyebrow">Bake saved</p>
           {result.suggestion ? (
             <>
               <h2>One thing to try next time</h2>
@@ -88,15 +89,6 @@ export function BatchScreen({
         </button>
       )}
 
-      {batch.sessions.length > 0 && (
-        <section className="card">
-          <h2>Bakes from this batch</h2>
-          {batch.sessions.map((s) => (
-            <SessionRow key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
-          ))}
-        </section>
-      )}
-
       <ActualForm batch={batch} unit={unit} onSave={async (a) => setBatch(await updateActual(batch.id, a))} />
 
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
@@ -108,6 +100,15 @@ export function BatchScreen({
       <p className="muted small">
         Planned for {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}.
       </p>
+      {batch.sessions.length > 0 && (
+        <details className="card"><summary>Bakes from this batch ({batch.sessions.length})</summary>
+          {batch.sessions.map((s) => (
+            <SessionRow key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
+          ))}
+        </details>
+      )}
+
+
       <button className="link danger" onClick={remove}>
         Delete batch
       </button>
@@ -158,11 +159,17 @@ function RateForm({
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState<File>();
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState('');
   const set = (patch: Partial<Survey>) => setSurvey({ ...survey, ...patch });
 
   return (
-    <section className="card">
+    <section className="card rating-card" aria-label="Rate this bake">
+      <p className="eyebrow">A quick bake check-in</p>
       <h2>How did it go?</h2>
+      <div className="rating-tabs" aria-label="Rating sections">{['Dough', 'Bake', 'Verdict'].map((label, i) => <button key={label} aria-current={step === i ? 'step' : undefined} className={step === i ? 'on' : ''} onClick={() => setStep(i)}>{i + 1}. {label}</button>)}</div>
+      <p className="muted small">Tap what fits. Skip anything you’re unsure of.</p>
+      <div hidden={step !== 0}>
       <div className="label">Dough was ready</div>
       <Chips
         value={survey.ready}
@@ -183,6 +190,7 @@ function RateForm({
           { v: 'snapped', label: 'Snapped back' },
         ]}
       />
+      </div><div hidden={step !== 1}>
       <div className="label">Rim</div>
       <Chips
         value={survey.rim}
@@ -212,6 +220,7 @@ function RateForm({
           { v: 'set', label: 'Cooked through' },
         ]}
       />
+      </div><div hidden={step !== 2}>
       <div className="label">Overall</div>
       <Chips
         value={survey.overall ? String(survey.overall) : undefined}
@@ -243,6 +252,7 @@ function RateForm({
           <input type="number" min={1} value={balls} onChange={(e) => setBalls(Number(e.target.value))} style={{ width: '5em' }} />
         </label>
       </div>
+      <details className="optional-notes"><summary>Add a note or photo (optional)</summary>
       <label>
         Note (optional)
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
@@ -251,19 +261,27 @@ function RateForm({
         Photo (optional)
         <input type="file" accept="image/*" capture="environment" onChange={(e) => setPhoto(e.target.files?.[0])} />
       </label>
-      <div className="row">
+      </details></div>
+      {error && <p className="warn" role="alert">{error}</p>}
+      <div className="rating-actions">
+        {step > 0 && <button onClick={() => setStep(step - 1)}>Back</button>}
+        {step < 2 && <button className="primary" onClick={() => setStep(step + 1)}>Next →</button>}
         <button
-          className="primary"
+          className={step === 2 ? "primary" : "link"}
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            await onSave({ ovenId, balls, survey, note: note || undefined, photo });
-            setBusy(false);
+            setError('');
+            try {
+              await onSave({ ovenId, balls, survey, note: note || undefined, photo });
+            } catch {
+              setError('Couldn’t save. Your answers are still here. Try again.');
+            } finally { setBusy(false); }
           }}
         >
-          Save
+          {busy ? 'Saving…' : 'Save rating'}
         </button>
-        <button className="link" onClick={onCancel}>
+        <button className="link" disabled={busy} onClick={onCancel}>
           Cancel
         </button>
       </div>
