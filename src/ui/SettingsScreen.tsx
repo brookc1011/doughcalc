@@ -1,3 +1,4 @@
+import { HELP_COPY, WATER_SOURCES } from './helpCopy';
 import { useState } from 'react';
 import { exportBackup, fmtWhen, importBackup, saveSettings, type Settings } from '../api';
 import type { Route } from './App';
@@ -17,18 +18,11 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
   };
 
   return (
-    <div className="pad">
+    <div className="pad settings-screen">
       <p className="eyebrow">Make yourself at home</p><h1>Settings</h1><p className="intro">Your kitchen, your defaults. Changes save as you go.</p>
 
       <section className="card">
-        <h2>Doughs</h2>
-        <p className="muted small">Set how many balls each dough starts with, add your own doughs, or hide the book ones.</p>
-        <button className="small" onClick={() => go({ name: 'doughs' })}>
-          Manage doughs
-        </button>
-      </section>
-
-      <section className="card">
+        <h2>Kitchen defaults</h2>
         <label>
           Units
           <select value={unit} onChange={(e) => save({ ...s, unit: e.target.value as 'F' | 'C' })}>
@@ -39,24 +33,25 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <label>
           <span>
             Warm-up out of the fridge (hours)
-            <Info>
-              How long balls sit out of the fridge before you stretch them. Cold dough tears and springs back. PizzaBlab:
-              typically 0.5-3 h, until the ball is at least 50°F.
-            </Info>
+            <Info label="warm-up time">{HELP_COPY["warm-up time"]}</Info>
           </span>
           <NumField value={s.warmUpH} onValue={(n) => save({ ...s, warmUpH: n })} />
         </label>
         <label>
           <span>
             Kitchen adjustment (yeast multiplier)
-            <Info>
-              Multiplies the yeast for every bake. 1 means as calculated. The Bakes tab counts how often your dough was
-              early, on time or late. Mostly early: go a little below 1. Mostly late: a little above. Change it in small
-              steps.
-            </Info>
+            <Info label="kitchen adjustment">{HELP_COPY["kitchen adjustment"]}</Info>
           </span>
           <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
         </label>
+      </section>
+
+      <section className="card">
+        <h2>Doughs</h2>
+        <p className="muted small">Set how many balls each dough starts with, add your own doughs, or hide the book ones.</p>
+        <button className="small" onClick={() => go({ name: 'doughs' })}>
+          Manage doughs
+        </button>
       </section>
 
       <details className="card"><summary>Water temperature</summary>
@@ -64,20 +59,8 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           Water temperature sets how warm the dough is after mixing, and that sets how fast it rises. When your room is in
           this range, use the book’s water. Outside it, the app works out a water temperature that lands the dough at the
           book’s target.
-          <Info
-            links={[
-              {
-                href: 'https://www.kingarthurbaking.com/blog/2018/05/29/desired-dough-temperature',
-                text: 'King Arthur: Desired dough temperature',
-              },
-              {
-                href: 'https://www.kingarthurbaking.com/blog/2018/08/27/determining-the-friction-factor-in-baking',
-                text: 'King Arthur: Determining the friction factor',
-              },
-            ]}
-          >
-            The math is King Arthur’s: 3 × target dough temp, minus room, flour and friction temps (4 × with a poolish).
-            Friction is the heat mixing adds. A mixer adds much more than hands.
+          <Info label="water temperature and friction" links={WATER_SOURCES}>
+            {HELP_COPY['water temperature and friction']}
           </Info>
         </p>
         <div className="row">
@@ -110,7 +93,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           can compare. Only matters if you use more than one.
         </p>
         {s.ovens.map((o) => (
-          <div className="row between" key={o.id}>
+          <div className="row between oven-row" key={o.id}>
             <span>{o.name}</span>
             {s.ovens.length > 1 && (
               <button className="small" onClick={() => save({ ...s, ovens: s.ovens.filter((x) => x.id !== o.id) })}>

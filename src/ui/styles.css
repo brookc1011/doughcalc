@@ -663,3 +663,200 @@ button.primary-small { background:var(--accent); color:var(--accent-ink); border
 .checklist-steps li.next::before { background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--soft); }
 .checklist-steps li.next .step-time { color:var(--accent); }
 .checklist-steps input[type=datetime-local] { flex:1 1 auto; min-width:0; }
+/* Round 2: shared touch and focus behavior. Existing theme tokens are unchanged. */
+button { min-width: 44px; }
+html { scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+input, select, textarea { scroll-margin-block: 80px 160px; }
+.kitchen-mark { width: 28px; height: 28px; flex: 0 0 auto; vertical-align: middle; }
+.empty-note { display: flex; align-items: center; gap: 16px; color: var(--olive); padding: 8px 0; }
+.empty-note p { color: var(--muted); font-size: .9rem; }
+
+/* Info: a quiet 20px symbol inside a genuine 44px hit target. */
+.info-btn {
+  width: 44px; height: 44px; min-width: 44px; margin: -8px 0 -8px 2px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--muted);
+  font: italic 600 13px/1 Georgia, serif;
+}
+.info-symbol { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: 50%; }
+.info-btn.on { background: transparent; color: var(--accent); }
+.info-btn.on .info-symbol { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.info-text { padding: 12px 14px; border-left: 2px solid var(--accent); border-radius: 0 10px 10px 0; line-height: 1.55; }
+.info-text a { display: flex; align-items: center; min-height: 44px; margin-top: 4px; }
+
+/* Plan: choose times together; read the result before advanced options. */
+.field-heading label { margin: 0; }
+.field-heading .link { max-width: 70%; }
+.plan-inputs .field-hint { font-size: .8rem; }
+.plan-inputs .ball { flex-wrap: nowrap; }
+.plan-inputs .ball input, .dough-editor .ball input { width: 0; }
+.save-defaults-row { display: flex; flex-wrap: wrap; align-items: center; margin: 8px 0 2px; }
+.save-defaults-row button { min-height: 44px; padding: 8px 12px; font-size: .8rem; background: var(--bg); }
+.save-defaults-row .info-btn { margin-block: 0; }
+.save-defaults-row .info-text { flex-basis: 100%; }
+.save-defaults-row button:disabled { opacity: 1; color: var(--olive); border-color: var(--line); }
+.timing-group { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; position: relative; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.timing-help { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; font-weight: 650; font-size: .9rem; }
+.timing-help .info-btn { margin: 0; }
+.timing-help .info-text { flex-basis: 100%; text-align: left; margin: 8px 0 12px; }
+.timing-group .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 0 8px; }
+.timing-group .chip { padding: 10px 6px; }
+.timing-hint { margin: 8px 0 16px; color: var(--muted); font-size: .85rem; }
+.ready-window { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 16px 0 12px; }
+.ready-window dl { margin: 12px 0; }
+.ready-window dl > div + div { margin-top: 12px; }
+.ready-window dt { color: var(--muted); font-size: .8rem; }
+.ready-window dd { margin: 2px 0 0; font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.fit-note { color: var(--olive); font-size: .9rem; border-left: 2px solid var(--olive); padding: 8px 12px; }
+.fitting-card { border-color: var(--accent); }
+.fitting-card h2 { margin-bottom: 8px; }
+.fit-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.fit-option span { font-weight: 600; overflow-wrap: anywhere; }
+.fitting-card > p { margin-bottom: 16px; }
+
+/* Batch: short in-page navigation, with no changes to browser route history. */
+.batch-jumps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 18px 0; padding: 5px; background: var(--soft); border-radius: 14px; }
+.batch-jumps button { border: 0; background: var(--card); color: var(--accent); font-size: .9rem; }
+#batch-steps, #batch-recipe, #batch-rating, #batch-result { scroll-margin-top: 16px; }
+#batch-rating { padding-top: 4px; }
+#batch-rating > .primary { margin-top: 16px; }
+.actual-toggle { margin: 8px 0 16px; border-style: solid; }
+.checklist > .row h2 { margin: 0; }
+.checklist > .row { margin-bottom: 8px; }
+.checklist .remind-row { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.remind-row .remind { display: inline-flex; gap: 8px; align-items: center; }
+.remind-row .kitchen-mark { width: 20px; height: 20px; }
+.remind-row > .muted { flex-basis: 100%; line-height: 1.5; }
+.checklist-steps .step-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.step-heading b { min-width: 0; overflow-wrap: anywhere; line-height: 1.4; }
+.step-heading button { flex-shrink: 0; }
+ol.checklist-steps { margin-top: 16px; }
+ol.checklist-steps li { padding: 16px 0 20px 18px; }
+ol.checklist-steps li::before { top: 24px; }
+ol.checklist-steps li.next { border: 1px solid var(--accent); border-left: 4px solid var(--accent); border-radius: 12px; background: var(--soft); padding: 16px; margin: 12px 0 16px; }
+ol.checklist-steps li.next::before { display: none; }
+.next-label { margin-bottom: 8px; color: var(--accent); }
+.checklist-steps li .step-time { margin: 8px 0; font-size: 1.1rem; }
+.checklist-steps li.next .step-time { font-size: 1.35rem; line-height: 1.35; }
+.checklist-steps .step-detail { line-height: 1.5; }
+.step-actions { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px; margin-top: 14px; }
+.step-actions .link { text-align: center; }
+.step-actions button { min-height: 48px; }
+ol.checklist-steps li.done { padding-top: 8px; padding-bottom: 10px; }
+.checklist-steps li.done .step-time { font-size: .85rem; margin: 0; font-weight: 500; }
+ol.checklist-steps li.passed { opacity: 1; color: var(--muted); padding-top: 12px; padding-bottom: 12px; }
+.checklist-steps li.passed::before { background: var(--muted); }
+.step-picker { padding: 12px; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.step-picker label { margin-top: 0; font-size: .85rem; }
+.step-picker input[type=datetime-local] { width: 100%; min-width: 0; max-width: 100%; }
+.step-picker .row { margin-top: 10px; }
+
+/* Rating: selection is immediate, without a low-contrast transition frame. */
+.chip { transition: transform .15s; }
+.chip.on, .chip[aria-pressed=true] { background-color: var(--accent); color: var(--accent-ink); -webkit-text-fill-color: var(--accent-ink); }
+.rating-actions { gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rating-actions > button { min-width: 64px; }
+.rating-actions > button.primary { flex-basis: 120px; }
+.rating-card .field-hint { font-weight: 400; }
+
+/* Dough library/editor and quieter supporting screens. */
+.dough-badge { font-size: .75rem; padding: 4px 8px; background: var(--bg); border-radius: 6px; color: var(--muted); }
+.dough-actions { margin-top: 12px; }
+.dough-actions > button:first-child { min-width: 88px; }
+.dough-editor h1 { font-size: 1.85rem; }
+.editor-action { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom)); background: var(--bg); padding: 4px 0; z-index: 2; }
+.dough-editor .ball { flex-wrap: nowrap; }
+.oven-row { padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.oven-row > span { flex: 1 1 140px; overflow-wrap: anywhere; }
+.timing-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+.timing-tally > div { text-align: center; background: var(--bg); padding: 12px 4px; border-radius: 10px; }
+.timing-tally dt { font-size: .8rem; color: var(--muted); }
+.timing-tally dd { margin: 4px 0 0; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media print { .batch-jumps, .editor-action, .info-btn { display: none !important; } }
+
+/* Keep batch shortcuts within reach while weighing or rating. */
+.batch-jumps { position: sticky; top: 8px; z-index: 3; box-shadow: 0 0 0 8px var(--bg); }
+#batch-steps, #batch-recipe, #batch-rating, #batch-result { scroll-margin-top: 88px; }
+@media print { .batch-jumps { display: none !important; } }
+/* Safari follow-up: all controls retain readable type, including the photo input. */
+:root { --tabs-clearance: calc(3.25rem + 17px); }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+input, select, textarea, input[type=file] {
+  font-size: max(16px, 1rem);
+  min-height: 44px;
+}
+input[type=datetime-local] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  min-height: 50px;
+  line-height: 1.4;
+  color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
+  background-color: var(--card);
+}
+input[type=datetime-local]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.4em;
+}
+input[type=datetime-local]::-webkit-datetime-edit { padding: 0; min-width: 0; }
+/* Keep the existing appearance:none select and CSS arrow rules above. */
+
+/* Safe areas apply in a browser tab and in Home Screen standalone mode. */
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: calc(var(--tabs-clearance) + 20px + env(safe-area-inset-bottom, 0px));
+}
+nav.tabs {
+  left: env(safe-area-inset-left, 0px);
+  right: env(safe-area-inset-right, 0px);
+}
+nav.tabs button { min-height: 3.25rem; min-width: 0; overflow-wrap: anywhere; }
+.plan-action, .editor-action {
+  bottom: calc(var(--tabs-clearance) + env(safe-area-inset-bottom, 0px));
+}
+.batch-jumps { top: calc(8px + env(safe-area-inset-top, 0px)); }
+#batch-steps, #batch-recipe, #batch-rating, #batch-result {
+  scroll-margin-top: calc(88px + env(safe-area-inset-top, 0px));
+  scroll-margin-bottom: calc(var(--tabs-clearance) + 24px + env(safe-area-inset-bottom, 0px));
+}
+input, select, textarea {
+  scroll-margin-top: calc(96px + env(safe-area-inset-top, 0px));
+  scroll-margin-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+}
+/* On touch devices, editing temporarily puts bars back into document flow.
+   This reacts to focus, not guessed keyboard height or an iPhone user-agent. */
+@media (any-pointer: coarse) {
+  @supports selector(.app:has(input:focus)) {
+    .app:has(input:not([type=file]):focus, textarea:focus, select:focus) nav.tabs,
+    .app:has(input:not([type=file]):focus, textarea:focus, select:focus) .plan-action,
+    .app:has(input:not([type=file]):focus, textarea:focus, select:focus) .editor-action,
+    .app:has(input:not([type=file]):focus, textarea:focus, select:focus) .batch-jumps {
+      position: static;
+      box-shadow: none;
+    }
+  }
+}
+/* A focus fallback remains visible on older engines; no sticky hover states. */
+@supports not selector(:focus-visible) {
+  button:focus, a:focus, input:focus, select:focus, textarea:focus,
+  summary:focus, .info-btn:focus { outline: 3px solid var(--accent); outline-offset: 3px; }
+}
+.kitchen-mark { display: inline-block; overflow: visible; }
+/* Optional review item: place reminders above steps; move this block with the JSX. */
+.checklist > .remind-row {
+  margin: 8px 0 16px;
+  padding: 12px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+.home-screen-help { flex-basis: 100%; }
+.home-screen-help summary { color: var(--accent); }
+.home-screen-help p { margin: 4px 0 8px; }
+@media print { .app { min-height: 0; padding: 0; } }

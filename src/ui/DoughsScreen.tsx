@@ -16,16 +16,18 @@ import {
   type Formula,
 } from '../api';
 import type { Route } from './App';
-import { NumField } from './common';
+import { KitchenMark, NumField } from './common';
 
 export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChange: () => void }) {
   const [lib, setLib] = useState<DoughEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [baseId, setBaseId] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState('');
 
   const load = () => doughLibrary().then((l) => {
     setLib(l);
+    setLoaded(true);
     setBaseId((id) => id || l.find((e) => !e.hidden)?.formula.id || l[0]?.formula.id || '');
   });
   useEffect(() => {
@@ -60,7 +62,7 @@ export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChang
   };
 
   return (
-    <div className="pad">
+    <div className="pad dough-library">
       <button className="link" onClick={() => go({ name: 'settings' })}>
         ← Settings
       </button>
@@ -74,21 +76,24 @@ export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChang
         </p>
       )}
 
-      <section className="card">
+      <section className="card dough-list">
+        <h2>Your doughs</h2>
+        {!loaded && <p className="muted small" role="status">Loading your doughs…</p>}
+        {loaded && shown.length === 0 && <div className="empty-note"><KitchenMark kind="dough" /><p>No doughs shown yet. Restore a hidden book dough below, or make a copy.</p></div>}
         {shown.map((e) => (
           <div className="session" key={e.formula.id}>
             <div className="row between">
               <b>{e.formula.name}</b>
-              <span className="muted small">{e.kind === 'book' ? (e.edited ? 'Book, edited' : 'Book') : 'Mine'}</span>
+              <span className="dough-badge">{e.kind === 'book' ? (e.edited ? 'Book, edited' : 'Book') : 'Mine'}</span>
             </div>
             <div className="muted small">
               {summary(e.formula)} · {e.formula.source}
             </div>
-            <div className="row">
+            <div className="row dough-actions">
               <button className="small" onClick={() => go({ name: 'dough', id: e.formula.id })}>
                 Edit
               </button>
-              <button className="small" onClick={() => remove(e)}>
+              <button className="link small" onClick={() => remove(e)}>
                 {e.kind === 'book' ? 'Hide' : 'Delete'}
               </button>
             </div>
@@ -196,7 +201,7 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
   };
 
   return (
-    <div className="pad">
+    <div className="pad dough-editor">
       <button className="link" onClick={() => go({ name: 'doughs' })}>
         ← Doughs
       </button>
@@ -205,15 +210,16 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
       <p className="muted small">{f.source}</p>
 
       <section className="card">
-        <h2>When I pick this dough, start with</h2>
+        <h2>Starting defaults</h2>
+        <p className="muted small">Used each time you pick this dough.</p>
         <div className="label">
           Dough balls <span className="field-hint">count × grams each</span>
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <NumField value={b.count} aria-label="Count" onValue={(n) => setBall(i, { count: n })} />
+            <NumField value={b.count} aria-label={`Ball group ${i + 1}: count`} onValue={(n) => setBall(i, { count: n })} />
             <span>×</span>
-            <NumField value={b.grams} aria-label="Grams each" onValue={(n) => setBall(i, { grams: n })} />
+            <NumField value={b.grams} aria-label={`Ball group ${i + 1}: grams each`} onValue={(n) => setBall(i, { grams: n })} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -292,9 +298,9 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
         </label>
       </section>
 
-      <button className="primary" onClick={save}>
+      <div className="editor-action"><button className="primary" onClick={save}>
         {saved ? 'Saved' : 'Save dough'}
-      </button>
+      </button></div>
       {entry.kind === 'book' && entry.edited && (
         <button
           className="link"

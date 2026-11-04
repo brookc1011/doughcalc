@@ -1,4 +1,6 @@
-import React, { useEffect, useState, type InputHTMLAttributes } from 'react';
+import { infoLabel } from './presentation';
+export { jumpTo } from './presentation';
+import React, { useEffect, useId, useState, type InputHTMLAttributes } from 'react';
 import {
   fmtGrams,
   fmtPct,
@@ -152,8 +154,13 @@ export function toLocalInput(d: Date): string {
  * Small "i" next to a label. Tap to show a short explanation, tap again to hide.
  * A span (not a button) so tapping the label text still focuses the input, not this.
  */
-export function Info({ children, links }: { children: React.ReactNode; links?: { href: string; text: string }[] }) {
+export function Info({ children, links, label = 'this field' }: {
+  children: React.ReactNode;
+  links?: { href: string; text: string }[];
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
+  const explanationId = useId();
   const toggle = (e: React.SyntheticEvent) => {
     e.preventDefault(); // inside a <label>, don't also focus the input and pop the keyboard
     e.stopPropagation();
@@ -166,14 +173,15 @@ export function Info({ children, links }: { children: React.ReactNode; links?: {
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={open ? 'Hide explanation' : 'What is this?'}
+        aria-controls={open ? explanationId : undefined}
+        aria-label={infoLabel(open, label)}
         onClick={toggle}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggle(e)}
       >
-        i
+        <span className="info-symbol" aria-hidden="true">i</span>
       </span>
       {open && (
-        <span className="info-text" onClick={(e) => e.preventDefault()}>
+        <span id={explanationId} className="info-text" onClick={(e) => e.preventDefault()}>
           {children}
           {links?.map((l) => (
             <a key={l.href} href={l.href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -206,5 +214,20 @@ export function Chips<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+/** A small decorative mark; all meaning stays in the adjacent text. */
+export function KitchenMark({ kind }: { kind: 'bell' | 'dough' }) {
+  return (
+    <svg className="kitchen-mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {kind === 'bell' ? <>
+        <path d="M8 13a8 8 0 0 1 16 0c0 8 3 9 3 9H5s3-1 3-9Z" />
+        <path d="M13 26c1 3 5 3 6 0M16 3v2" />
+      </> : <>
+        <path d="M4 22c0-8 5-14 12-14s12 6 12 14c-5 4-19 4-24 0Z" />
+        <path d="m11 13-3 5m10-6-3 6m9-3-2 4M8 28h16" />
+      </>}
+    </svg>
   );
 }

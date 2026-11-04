@@ -1,3 +1,5 @@
+import { READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation';
+import { HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
   allDoughs,
@@ -169,34 +171,29 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
       <p className="intro">{TIMING_INTRO[timing]}</p>
 
       <section className="card plan-inputs">
-        <label>
-          <span className="row between">
-            Dough
+        <div className="row between field-heading">
+            <label htmlFor="plan-dough">Dough</label>
             <button type="button" className="link small" onClick={() => go({ name: 'doughs' })}>
               Manage doughs
             </button>
-          </span>
-          <select value={doughId} onChange={(e) => pickDough(e.target.value)}>
+        </div>
+          <select id="plan-dough" value={doughId} onChange={(e) => pickDough(e.target.value)}>
             {doughs.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
             ))}
           </select>
-        </label>
 
         <div className="label">
           Dough balls <span className="field-hint">count × grams each</span>
-          <Info>
-            How many balls and how heavy each one is. Their total sets the recipe. Add a second line only if you want a
-            second size, like a couple of small focaccia balls.
-          </Info>
+          <Info label="dough balls">{HELP_COPY["dough balls"]}</Info>
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label="Count" />
+            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label={`Ball group ${i + 1}: count`} />
             <span>×</span>
-            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label="Grams each" />
+            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`Ball group ${i + 1}: grams each`} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -205,6 +202,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             )}
           </div>
         ))}
+        <div className="save-defaults-row">
+          <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved}>
+            {defaultsSaved ? 'Saved' : 'Save defaults'}
+          </button>
+          <Info label="saved defaults">{HELP_COPY["saved defaults"]}</Info>
+        </div>
         <details className="size-options"><summary>Sizes & diameter</summary>
         <p className="muted small">
           “Set ball for size” changes the first line’s grams so a bigger or smaller pizza keeps the same thickness as{' '}
@@ -218,17 +221,14 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         </div>
 
         </details>
-        <button type="button" className="link small" onClick={saveDefaults} disabled={defaultsSaved}>
-          {defaultsSaved ? `Saved as the starting point for ${formula.name}` : 'Always start this dough this way'}
-        </button>
-        <div className="label">
-          Plan around
-          <Info>
-            Eat at works back from dinner. Start at tells you when it’s ready. Both fits the dough between the two by
-            using fridge time, which doesn’t change the yeast (FWSY p.219).
-          </Info>
+        <fieldset className="timing-group">
+        <legend className="sr-only">Plan around</legend>
+        <div className="timing-help">
+          <span>Plan around</span>
+          <Info label="planning times">{HELP_COPY["planning times"]}</Info>
         </div>
         <Chips value={timing} options={TIMING_OPTIONS} onChange={setTiming} />
+        <p className="timing-hint">{TIMING_HINTS[timing]}</p>
         {timing !== 'eat' && (
           <label>
             Start at <span className="field-hint">{formula.family === 'poolish' ? 'mixing the poolish' : 'first step'}</span>
@@ -242,29 +242,55 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </label>
         )}
         {plan.window && (
-          <p className="muted small">
-            From this start, {formula.name} is ready {fmtWhen(plan.window.earliest)} at the earliest. The balls keep in the
-            fridge until {fmtWhen(plan.window.latest)} with the same yeast (FWSY p.219)
-            {timing === 'start' ? ', so you can eat any time between.' : '.'}
-          </p>
+          <div className="ready-window">
+            <p className="eyebrow">Ready window</p>
+            <p className="muted small">From this start, {formula.name}:</p>
+            <dl>
+              <div><dt>Ready from</dt><dd>{fmtWhen(plan.window.earliest)}</dd></div>
+              <div><dt>Keeps in the fridge until</dt><dd>{fmtWhen(plan.window.latest)}</dd></div>
+            </dl>
+            <p className="muted small">{READY_WINDOW_SOURCE}
+              {timing === 'start' ? ' Eat any time in this window.' : ''}
+            </p>
+          </div>
         )}
-        {plan.fitNote && <p className="small">{plan.fitNote}</p>}
+        {plan.fitNote && <p className="fit-note">{plan.fitNote}</p>}
+        </fieldset>
         <label>
           <span>
             Room temperature (°{unit})
-            <Info>
-              Warmer rooms ferment faster. Sets the water temperature and, off the book schedule, the yeast estimate.
-            </Info>
+            <Info label="room temperature">{HELP_COPY["room temperature"]}</Info>
           </span>
           <NumField value={room} onValue={setRoom} />
         </label>
       </section>
+
+      {plan.errors.map((e) => (
+        <p className="warn" role="alert" key={e}>
+          {e}
+        </p>
+      ))}
+      {fitting.length > 0 && (
+        <section className="card fitting-card">
+          <h2>A dough that fits</h2>
+          <p className="small">These doughs fit your start and eat times on the book schedule:</p>
+          {fitting.map((d) => (
+            <div className="fit-option" key={d.id}>
+              <span>{d.name}</span>
+              <button className="small" aria-label={`Use ${d.name}`} onClick={() => pickDough(d.id)}>
+                Use it
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       <button className="details-toggle" aria-expanded={details} onClick={() => setDetails(!details)}>
         {details ? '− Hide details' : '+ Details'}
       </button>
       {details && (
         <section className="card">
+          <h2>Fine-tune this bake</h2>
           <label>
             Mixing
             <select value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
@@ -275,7 +301,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           <label>
             <span>
               {stageLabel}
-              <Info>
+              <Info label="ferment time">
                 {formula.family === 'poolish'
                   ? 'How long the poolish sits out before the final mix.'
                   : 'Time from mixing to dividing into balls.'}{' '}
@@ -287,10 +313,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           <label>
             <span>
               Yeast % override (optional)
-              <Info>
-                Leave blank. Type a % only to use your own amount, e.g. from another recipe. 0.08 means 0.08% of the
-                flour weight.
-              </Info>
+              <Info label="yeast override">{HELP_COPY["yeast override"]}</Info>
             </span>
             <input
               type="number"
@@ -316,30 +339,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
               <NumField value={+(formula.salt * 100).toFixed(2)} onValue={(n) => setEdits({ ...edits, salt: n / 100 })} />
             </label>
           </div>
+
           {(edited || isPreset(formula)) && (
             <button className="small" onClick={saveAsMine}>
               Save as My Dough
             </button>
           )}
-        </section>
-      )}
-
-      {plan.errors.map((e) => (
-        <p className="warn" role="alert" key={e}>
-          {e}
-        </p>
-      ))}
-      {fitting.length > 0 && (
-        <section className="card">
-          <p className="small">These doughs fit your start and eat times on the book schedule:</p>
-          {fitting.map((d) => (
-            <div className="row between" key={d.id}>
-              <span>{d.name}</span>
-              <button className="small" onClick={() => pickDough(d.id)}>
-                Use it
-              </button>
-            </div>
-          ))}
         </section>
       )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { doughHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
 import type { Route } from './App';
+import { KitchenMark } from './common';
 
 type History = Awaited<ReturnType<typeof doughHistory>>;
 
@@ -53,9 +54,11 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
       {tally && tally.early + tally.onTime + tally.late > 0 && (
         <section className="card">
           <h2>Dough timing</h2>
-          <p>
-            Early {tally.early} · On time {tally.onTime} · Late {tally.late}
-          </p>
+          <dl className="timing-tally">
+            <div><dt>Early</dt><dd>{tally.early}</dd></div>
+            <div><dt>On time</dt><dd>{tally.onTime}</dd></div>
+            <div><dt>Late</dt><dd>{tally.late}</dd></div>
+          </dl>
           <p className="muted small">
             If one side keeps winning, set a kitchen adjustment in Settings (now x{settings.kitchenFactor.toFixed(2)}).
           </p>
@@ -64,7 +67,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
 
       <section className="card">
         <h2>All batches</h2>
-        {batches.length === 0 && <p className="muted">Nothing yet. Plan a bake and lock it in.</p>}
+        {batches.length === 0 && <div className="empty-note"><KitchenMark kind="dough" /><p className="muted">Nothing yet. Plan a bake and lock it in.</p></div>}
         {batches.map((b) => {
           const scores = b.sessions.map((s) => s.survey.overall).filter(Boolean);
           return (

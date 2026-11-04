@@ -1,3 +1,5 @@
+import { BATCH_TARGETS, HOME_SCREEN_HELP, reminderStatus, stepPresentation } from './presentation';
+import { HELP_COPY } from './helpCopy';
 import { useEffect, useState } from 'react';
 import {
   addSession,
@@ -22,7 +24,7 @@ import {
   type Survey,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, Info, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
+import { Chips, cToF, download, fToC, Info, jumpTo, KitchenMark, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
 
 export function BatchScreen({
   id,
@@ -38,6 +40,9 @@ export function BatchScreen({
   const [batch, setBatch] = useState<Batch | null>(null);
   const [rating, setRating] = useState(false);
   const [result, setResult] = useState<{ suggestion?: Suggestion; backupDue: boolean } | null>(null);
+
+  useEffect(() => { if (rating) jumpTo(BATCH_TARGETS.rating); }, [rating]);
+  useEffect(() => { if (result) jumpTo(BATCH_TARGETS.result); }, [result]);
 
   useEffect(() => {
     getBatch(id).then((b) => setBatch(b ?? null));
@@ -59,10 +64,16 @@ export function BatchScreen({
         ← Bakes
       </button>
       <h1>{batch.title}</h1>
-      <p className="muted">Locked in {fmtWhen(batch.createdAt)}</p>
+      <p className="muted small">Locked in {fmtWhen(batch.createdAt)}</p>
+
+      <nav className="batch-jumps" aria-label="Batch shortcuts">
+        <button onClick={() => jumpTo(BATCH_TARGETS.steps)}>Steps</button>
+        <button onClick={() => jumpTo(BATCH_TARGETS.recipe)}>Recipe</button>
+        <button onClick={() => { setRating(true); jumpTo(BATCH_TARGETS.rating); }}>Rate</button>
+      </nav>
 
       {result && (
-        <section className="card highlight" role="status">
+        <section id={BATCH_TARGETS.result} tabIndex={-1} className="card highlight" role="status">
           <p className="eyebrow">Bake saved</p>
           {result.suggestion ? (
             <>
@@ -79,6 +90,14 @@ export function BatchScreen({
 
       <Checklist batch={batch} onChange={setBatch} />
 
+<section id={BATCH_TARGETS.recipe} tabIndex={-1} aria-label="Batch recipe">
+      <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
+      <p className="muted small">
+        Planned for {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}.
+      </p>
+</section>
+
+      <section id={BATCH_TARGETS.rating} tabIndex={-1} aria-label="Bake feedback">
       {rating ? (
         <RateForm
           settings={settings}
@@ -97,12 +116,10 @@ export function BatchScreen({
         </button>
       )}
 
+      </section>
+
       <ActualForm batch={batch} unit={unit} onSave={async (a) => setBatch(await updateActual(batch.id, a))} />
 
-      <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
-      <p className="muted small">
-        Planned for {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}.
-      </p>
       {batch.sessions.length > 0 && (
         <details className="card"><summary>Bakes from this batch ({batch.sessions.length})</summary>
           {batch.sessions.map((s) => (
@@ -150,7 +167,7 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
   };
 
   return (
-    <section className="card checklist">
+    <section id={BATCH_TARGETS.steps} tabIndex={-1} className="card checklist" aria-label="Batch steps">
       <div className="row between">
         <h2>Steps</h2>
         <button className="link small" onClick={() => download('dough-batch.ics', batchIcs(batch), 'text/calendar')}>
@@ -158,6 +175,7 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
         </button>
       </div>
 
+      {/* Optional review item: reminders above the step list. */}
       {!allDone && (
         <div className="remind-row">
           <button
@@ -166,23 +184,19 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
             disabled={busy || perm === 'unsupported' || perm === 'not-set-up'}
             onClick={toggleReminders}
           >
-            {busy ? 'One moment…' : remindOn ? '🔔 Reminders on' : '🔕 Remind me'}
+            <KitchenMark kind="bell" />
+            {busy ? 'One moment…' : remindOn ? 'Reminders on' : 'Remind me'}
           </button>
           <span className="muted small">
-            {perm === 'unsupported'
-              ? 'This browser can’t show reminders. On iPhone, add the app to your home screen first.'
-              : perm === 'not-set-up'
-                ? 'Reminders aren’t set up on the server yet.'
-                : perm === 'denied'
-                  ? 'Notifications are blocked. Allow them in your phone’s settings.'
-                  : remindOn
-                    ? 'Your phone buzzes at each step, even with the app closed.'
-                    : 'A notification at each step, even with the app closed.'}
-            <Info>
-              Your phone gets a private notification address. Only that address and the step times go to the app’s
-              reminder server, never your recipe or bakes. Checking a step off re-sends the new times.
-            </Info>
+            {reminderStatus(perm, remindOn)}
+            <Info label="reminder privacy">{HELP_COPY["reminder privacy"]}</Info>
           </span>
+          {perm === 'unsupported' && (
+            <details className="home-screen-help">
+              <summary>How to add on iPhone</summary>
+              <p className="muted small">{HOME_SCREEN_HELP}</p>
+            </details>
+          )}
           {msg && (
             <p className="warn" role="alert">
               {msg}
@@ -199,54 +213,59 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
 
       <ol className="timeline checklist-steps">
         {prog.steps.map((s) => {
-          const state = s.doneAt ? 'done' : s.passed ? 'passed' : s.key === prog.nextKey ? 'next' : '';
+          const state = stepPresentation(s, prog.nextKey);
           return (
-            <li key={s.key} className={state}>
-              <div className="row between">
-                <b>
-                  {s.doneAt ? '✓ ' : ''}
-                  {s.label}
-                </b>
-                {s.doneAt ? (
-                  <button className="link small" onClick={async () => onChange(await uncheckStep(batch.id, s.key))}>
+            <li key={s.key} className={state} aria-current={state === 'next' ? 'step' : undefined}>
+              {state === 'next' && <p className="eyebrow next-label">Up next</p>}
+              <div className="step-heading">
+                <b>{s.doneAt ? '✓ ' : ''}{s.label}</b>
+                {s.doneAt && (
+                  <button className="link small" aria-label={`Undo ${s.label}`} onClick={async () => onChange(await uncheckStep(batch.id, s.key))}>
                     Undo
                   </button>
-                ) : (
-                  !s.passed && (
-                    <span className="row">
-                      <button
-                        className="link small"
-                        onClick={() => {
-                          setPickFor(pickFor === s.key ? null : s.key);
-                          setPickAt(toLocalInput(new Date()));
-                        }}
-                      >
-                        at…
-                      </button>
-                      <button className={state === 'next' ? 'small primary-small' : 'small'} onClick={() => check(s.key)}>
-                        Done
-                      </button>
-                    </span>
-                  )
                 )}
               </div>
               <div className="step-time">
                 {s.doneAt ? `Done ${fmtWhen(s.doneAt)}` : s.passed ? 'Not ticked' : fmtWhen(s.at)}
               </div>
-              {pickFor === s.key && (
-                <div className="row">
-                  <input
-                    type="datetime-local"
-                    aria-label={`When you did: ${s.label}`}
-                    value={pickAt}
-                    onChange={(e) => setPickAt(e.target.value)}
-                  />
-                  <button className="small" disabled={!pickAt} onClick={() => check(s.key, new Date(pickAt))}>
-                    Save
+              {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.detail}</div>}
+              {!s.doneAt && !s.passed && (
+                <div className="step-actions">
+                  <button className={state === 'next' ? 'small primary-small' : 'small'} aria-label={`Mark ${s.label} done now`} onClick={() => check(s.key)}>
+                    Done now
+                  </button>
+                  <button
+                    className="link small"
+                    aria-expanded={pickFor === s.key}
+                    aria-label={`Choose completion time for ${s.label}`}
+                    onClick={() => {
+                      setPickFor(pickFor === s.key ? null : s.key);
+                      setPickAt(toLocalInput(new Date()));
+                    }}
+                  >
+                    Choose time
                   </button>
                 </div>
               )}
-              {!s.doneAt && !s.passed && <div className="muted small">{s.detail}</div>}
+              {pickFor === s.key && (
+                <div className="step-picker">
+                  <label>
+                    When did you do this?
+                    <input
+                      type="datetime-local"
+                      aria-label={`When you did: ${s.label}`}
+                      value={pickAt}
+                      onChange={(e) => setPickAt(e.target.value)}
+                    />
+                  </label>
+                  <div className="row">
+                    <button className="small primary-small" disabled={!pickAt} onClick={() => check(s.key, new Date(pickAt))}>
+                      Save time
+                    </button>
+                    <button className="link small" onClick={() => setPickFor(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </li>
           );
         })}
@@ -361,7 +380,7 @@ function RateForm({
         ]}
       />
       </div><div hidden={step !== 2}>
-      <div className="label">Overall</div>
+      <div className="label">Overall <span className="field-hint">1 = rough · 5 = loved it</span></div>
       <Chips
         value={survey.overall ? String(survey.overall) : undefined}
         onChange={(v) => set({ overall: Number(v) as Survey['overall'] })}
@@ -442,7 +461,7 @@ function ActualForm({ batch, unit, onSave }: { batch: Batch; unit: 'F' | 'C'; on
 
   if (!open) {
     return (
-      <button className="link" onClick={() => setOpen(true)}>
+      <button className="details-toggle actual-toggle" onClick={() => setOpen(true)}>
         What actually happened (optional)
       </button>
     );
