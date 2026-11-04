@@ -5,7 +5,7 @@
   "src/data/push.ts": "5daf7eb9881ce8280cb351be1389ff89ae2a865d257fa7ae2995e8826cc78479",
   "src/data/store.ts": "c778b9921e19bce467b5c859152a2fb310f5dbe9de6bb2442c77237d63ab5a5e",
   "src/data/types.ts": "f7158d68e583ddb35a98d0ef6b4f69d133611ef14c6fd328a176e3b2d265d479",
-  "src/data/vapid.ts": "9eaaa7538e06d660533e5e9fb6a435a840840d0465a7f4079b288d967382dee5",
+  "src/data/vapid.ts": "3eb1f6b5d6904f759d3dc84f039c95467c3bae5fad53fbe4bba27a4dbc67690f",
   "src/engine/advice.ts": "bc7b2c79674f6c711c2b7b35e47aa642e6887f523685b2c70b459c8afc782590",
   "src/engine/calendar.ts": "c58e6dfa5884634676194bbbb60326820af52e4799dcce1be5a3f3ea34b42ab2",
   "src/engine/formula.ts": "b16c5085772efe5aa55452225be3bd1fe6a35650e36abdaa62395b07471e2edc",
