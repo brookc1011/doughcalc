@@ -1,4 +1,4 @@
-import { useEffect, useState, type InputHTMLAttributes } from 'react';
+import React, { useEffect, useState, type InputHTMLAttributes } from 'react';
 import {
   fmtGrams,
   fmtPct,
@@ -146,6 +146,44 @@ export async function shareOrDownload(filename: string, text: string, type: stri
 export function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Small "i" next to a label. Tap to show a short explanation, tap again to hide.
+ * A span (not a button) so tapping the label text still focuses the input, not this.
+ */
+export function Info({ children, links }: { children: React.ReactNode; links?: { href: string; text: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const toggle = (e: React.SyntheticEvent) => {
+    e.preventDefault(); // inside a <label>, don't also focus the input and pop the keyboard
+    e.stopPropagation();
+    setOpen(!open);
+  };
+  return (
+    <>
+      <span
+        className={open ? 'info-btn on' : 'info-btn'}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label={open ? 'Hide explanation' : 'What is this?'}
+        onClick={toggle}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggle(e)}
+      >
+        i
+      </span>
+      {open && (
+        <span className="info-text" onClick={(e) => e.preventDefault()}>
+          {children}
+          {links?.map((l) => (
+            <a key={l.href} href={l.href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              {l.text} ↗
+            </a>
+          ))}
+        </span>
+      )}
+    </>
+  );
 }
 
 export const fToC = (f: number) => ((f - 32) * 5) / 9;

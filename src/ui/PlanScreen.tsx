@@ -18,7 +18,7 @@ import {
   type TimingMode,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, NumField, RecipeView, Timeline, toLocalInput } from './common';
+import { Chips, cToF, download, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
 function tomorrowAt(hour: number): Date {
   const d = new Date();
@@ -58,7 +58,6 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const [mixer, setMixer] = useState<'hand' | 'mixer'>(settings.mixer);
   const [details, setDetails] = useState(false);
   const [stageH, setStageH] = useState<number | undefined>();
-  const [mixAt, setMixAt] = useState('');
   const [manualYeast, setManualYeast] = useState('');
   const [edits, setEdits] = useState<{ hydration?: number; salt?: number }>({});
   const [saving, setSaving] = useState(false);
@@ -98,7 +97,6 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         roomF: unit === 'F' ? room : cToF(room),
         stageH: ownStage ? stageH : undefined,
         mixer,
-        mixAt: timing === 'eat' && mixAt ? new Date(mixAt) : undefined,
         timing,
         startAt: timing === 'eat' ? undefined : new Date(startAt),
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
@@ -108,7 +106,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, stageH, mixer, mixAt, timing, startAt, manualYeast, settings, unit],
+    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, settings, unit],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.
@@ -187,7 +185,13 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </select>
         </label>
 
-        <div className="label">Dough balls <span className="field-hint">count × grams each</span></div>
+        <div className="label">
+          Dough balls <span className="field-hint">count × grams each</span>
+          <Info>
+            How many balls and how heavy each one is. Their total sets the recipe. Add a second line only if you want a
+            second size, like a couple of small focaccia balls.
+          </Info>
+        </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
             <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label="Count" />
@@ -201,16 +205,11 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             )}
           </div>
         ))}
-        <details className="size-options"><summary>Labels, sizes & diameter</summary>
-          {balls.map((b, i) => <label key={i}>Ball group {i + 1} label
-            <input
-              className="grow ball-label"
-              value={b.label ?? ''}
-              placeholder="pizza"
-              onChange={(e) => setBall(i, { label: e.target.value })}
-              aria-label="Label"
-            />
-</label>)}
+        <details className="size-options"><summary>Sizes & diameter</summary>
+        <p className="muted small">
+          “Set ball for size” changes the first line’s grams so a bigger or smaller pizza keeps the same thickness as{' '}
+          {formula.ballG} g on {formula.ballDiameterIn}".
+        </p>
         <div className="row">
           <button className="small" onClick={() => setBalls([...balls, { count: 1, grams: 200, label: 'focaccia' }])}>
             + another size
@@ -222,7 +221,13 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         <button type="button" className="link small" onClick={saveDefaults} disabled={defaultsSaved}>
           {defaultsSaved ? `Saved as the starting point for ${formula.name}` : 'Always start this dough this way'}
         </button>
-        <div className="label">Plan around</div>
+        <div className="label">
+          Plan around
+          <Info>
+            Eat at works back from dinner. Start at tells you when it’s ready. Both fits the dough between the two by
+            using fridge time, which doesn’t change the yeast (FWSY p.219).
+          </Info>
+        </div>
         <Chips value={timing} options={TIMING_OPTIONS} onChange={setTiming} />
         {timing !== 'eat' && (
           <label>
@@ -245,7 +250,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         )}
         {plan.fitNote && <p className="small">{plan.fitNote}</p>}
         <label>
-          Room temperature (°{unit})
+          <span>
+            Room temperature (°{unit})
+            <Info>
+              Warmer rooms ferment faster. Sets the water temperature and, off the book schedule, the yeast estimate.
+            </Info>
+          </span>
           <NumField value={room} onValue={setRoom} />
         </label>
       </section>
@@ -263,17 +273,25 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             </select>
           </label>
           <label>
-            {stageLabel}
+            <span>
+              {stageLabel}
+              <Info>
+                {formula.family === 'poolish'
+                  ? 'How long the poolish sits out before the final mix.'
+                  : 'Time from mixing to dividing into balls.'}{' '}
+                The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.
+              </Info>
+            </span>
             <NumField value={stageH ?? defaultStageH(formula)} onValue={setStageH} />
           </label>
-          {timing === 'eat' && (
-            <label>
-              Fixed mix time (optional)
-              <input type="datetime-local" value={mixAt} onChange={(e) => setMixAt(e.target.value)} />
-            </label>
-          )}
           <label>
-            Yeast % override (optional)
+            <span>
+              Yeast % override (optional)
+              <Info>
+                Leave blank. Type a % only to use your own amount, e.g. from another recipe. 0.08 means 0.08% of the
+                flour weight.
+              </Info>
+            </span>
             <input
               type="number"
               step={0.01}
@@ -282,6 +300,9 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
               onChange={(e) => setManualYeast(e.target.value)}
             />
           </label>
+          <p className="muted small">
+            Hydration and salt below change this bake only. “Save as My Dough” keeps them.
+          </p>
           <div className="row">
             <label className="grow">
               Hydration %

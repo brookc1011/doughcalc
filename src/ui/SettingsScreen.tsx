@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { exportBackup, fmtWhen, importBackup, saveSettings, type Settings } from '../api';
 import type { Route } from './App';
-import { cToF, fToC, NumField, shareOrDownload } from './common';
+import { cToF, fToC, Info, NumField, shareOrDownload } from './common';
 
 export function SettingsScreen({ settings, onChange, go }: { settings: Settings; onChange: () => void; go: (r: Route) => void }) {
   const [s, setS] = useState(settings);
@@ -37,21 +37,48 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           </select>
         </label>
         <label>
-          Warm-up out of the fridge (hours)
+          <span>
+            Warm-up out of the fridge (hours)
+            <Info>
+              How long balls sit out of the fridge before you stretch them. Cold dough tears and springs back. PizzaBlab:
+              typically 0.5-3 h, until the ball is at least 50°F.
+            </Info>
+          </span>
           <NumField value={s.warmUpH} onValue={(n) => save({ ...s, warmUpH: n })} />
-          <span className="muted small">PizzaBlab: typically 0.5-3 h, until the ball is at least 50°F.</span>
         </label>
         <label>
-          Kitchen adjustment (yeast multiplier)
+          <span>
+            Kitchen adjustment (yeast multiplier)
+            <Info>
+              Multiplies the yeast for every bake. 1 means as calculated. The Bakes tab counts how often your dough was
+              early, on time or late. Mostly early: go a little below 1. Mostly late: a little above. Change it in small
+              steps.
+            </Info>
+          </span>
           <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
-          <span className="muted small">1 = as calculated. Below 1 if your dough keeps running early, above 1 if late.</span>
         </label>
       </section>
 
       <details className="card"><summary>Water temperature</summary>
-        <p className="muted small">
-          Inside this room range the app shows the book's water temperature. Outside it, the app calculates water to hit the
-          book's dough temperature.
+        <p className="small">
+          Water temperature sets how warm the dough is after mixing, and that sets how fast it rises. When your room is in
+          this range, use the book’s water. Outside it, the app works out a water temperature that lands the dough at the
+          book’s target.
+          <Info
+            links={[
+              {
+                href: 'https://www.kingarthurbaking.com/blog/2018/05/29/desired-dough-temperature',
+                text: 'King Arthur: Desired dough temperature',
+              },
+              {
+                href: 'https://www.kingarthurbaking.com/blog/2018/08/27/determining-the-friction-factor-in-baking',
+                text: 'King Arthur: Determining the friction factor',
+              },
+            ]}
+          >
+            The math is King Arthur’s: 3 × target dough temp, minus room, flour and friction temps (4 × with a poolish).
+            Friction is the heat mixing adds. A mixer adds much more than hands.
+          </Info>
         </p>
         <div className="row">
           <label className="grow">
@@ -78,6 +105,10 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
 
       <section className="card">
         <h2>Ovens</h2>
+        <p className="muted small">
+          Name each setup you bake with, like “steel, 550°F, top rack”. Every rating records which one you used, so you
+          can compare. Only matters if you use more than one.
+        </p>
         {s.ovens.map((o) => (
           <div className="row between" key={o.id}>
             <span>{o.name}</span>

@@ -215,13 +215,6 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
             <span>×</span>
             <NumField value={b.grams} aria-label="Grams each" onValue={(n) => setBall(i, { grams: n })} />
             <span>g</span>
-            <input
-              className="ball-label"
-              value={b.label ?? ''}
-              placeholder="pizza"
-              aria-label="Label"
-              onChange={(e) => setBall(i, { label: e.target.value })}
-            />
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
                 ✕

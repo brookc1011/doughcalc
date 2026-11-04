@@ -640,3 +640,12 @@ select {
   background-repeat:no-repeat;
   padding-right:40px;
 }
+
+/* Info "i" buttons and their explanations */
+.info-btn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:6px;
+  border:1px solid var(--muted); border-radius:50%; color:var(--muted); font:italic 600 12px/1 Georgia, serif;
+  vertical-align:middle; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
+.info-btn.on { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+.info-text { display:block; margin:6px 0 4px; padding:10px 12px; border-radius:10px; background:var(--soft);
+  color:var(--ink); font-size:14px; font-weight:400; line-height:1.45; text-transform:none; letter-spacing:normal; }
+.info-text a { display:block; margin-top:6px; color:var(--accent); }
