@@ -629,3 +629,14 @@ nav.tabs button.on {
   font-size:.75rem;
   color:var(--muted);
 }
+/* Safari draws its own grey dropdowns; draw our own so they match the other boxes in light and dark. */
+select {
+  -webkit-appearance:none;
+  appearance:none;
+  background-color:var(--card);
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;
+  background-size:6px 6px;
+  background-repeat:no-repeat;
+  padding-right:40px;
+}
