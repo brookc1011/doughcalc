@@ -80,6 +80,54 @@ describe('api contracts', () => {
     expect(api.isPreset(found)).toBe(false);
   });
 
+  it('book doughs start at 5 balls of the book weight', async () => {
+    const f = await api.findDough('forkish-poolish');
+    expect(api.defaultBalls(f)).toEqual([{ count: 5, grams: 350, label: 'pizza' }]);
+  });
+
+  it('change a book dough default to 2 balls, then reset to the book', async () => {
+    const f = await api.findDough('forkish-overnight');
+    await api.saveDough({ ...f, defaults: { balls: [{ count: 2, grams: 340, label: 'pizza' }], eatHour: 19 } });
+    const edited = (await api.doughLibrary()).find((e) => e.formula.id === 'forkish-overnight')!;
+    expect(edited.edited).toBe(true);
+    expect(api.defaultBalls(edited.formula)[0].count).toBe(2);
+    expect((await api.allDoughs()).filter((d) => d.id === 'forkish-overnight').length).toBe(1);
+
+    await api.resetDough('forkish-overnight');
+    const back = await api.findDough('forkish-overnight');
+    expect(back.defaults).toBeUndefined();
+    expect(api.defaultBalls(back)[0].count).toBe(5);
+  });
+
+  it('hide a book dough, then restore it', async () => {
+    await api.removeDough('forkish-same-day');
+    expect((await api.allDoughs()).map((d) => d.id)).not.toContain('forkish-same-day');
+    const hidden = (await api.doughLibrary()).find((e) => e.formula.id === 'forkish-same-day')!;
+    expect(hidden.hidden).toBe(true);
+    await api.restoreDough('forkish-same-day');
+    expect((await api.allDoughs()).map((d) => d.id)).toContain('forkish-same-day');
+  });
+
+  it('hiding the last-used dough moves the default to another dough', async () => {
+    await api.removeDough('forkish-overnight');
+    const s = await api.getSettings();
+    expect(s.lastDoughId).not.toBe('forkish-overnight');
+    expect((await api.allDoughs()).map((d) => d.id)).toContain(s.lastDoughId);
+  });
+
+  it('your own dough is deleted for good; the last dough cannot be removed', async () => {
+    const mine = await api.cloneDough(await api.findDough('forkish-overnight'), 'Mine');
+    await api.removeDough('forkish-overnight');
+    await api.removeDough('forkish-same-day');
+    await api.removeDough('forkish-poolish');
+    expect((await api.allDoughs()).map((d) => d.id)).toEqual([mine.id]);
+    await expect(api.removeDough(mine.id)).rejects.toThrow(/at least one/);
+
+    await api.restoreDough('forkish-poolish');
+    await api.removeDough(mine.id);
+    expect((await api.doughLibrary()).some((e) => e.formula.id === mine.id)).toBe(false);
+  });
+
   it('export then import into an empty phone restores everything', async () => {
     const b = await lockOne();
     await api.addSession(b.id, { ovenId: 'home-oven', balls: 5, survey: { overall: 5 } });

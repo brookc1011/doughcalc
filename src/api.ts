@@ -4,14 +4,14 @@ import { readyTally, suggestions, topSuggestion, type ReadyTally, type Suggestio
 import { googleCalendarLink, stepsToIcs } from './engine/calendar';
 import { rescaleBall, roundArea } from './engine/geometry';
 import { defaultStageH, planBatch, type Plan } from './engine/plan';
-import { PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
+import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
-import type { BallGroup, Formula, Ingredient } from './engine/types';
+import type { BallGroup, DoughDefaults, Formula, Ingredient } from './engine/types';
 import { downscalePhoto } from './data/photo';
 import * as store from './data/store';
 import type { Actual, BakeSession, Batch, Oven, Settings, StepRecord } from './data/types';
 
-export type { Actual, BakeSession, Batch, BallGroup, Formula, Ingredient, Oven, Plan, ReadyTally, Settings, Suggestion, Survey };
+export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, ReadyTally, Settings, Suggestion, Survey };
 export { PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
 
 /** Backup reminder cadence, in bake sessions. */
@@ -32,27 +32,89 @@ export async function requestPersistence(): Promise<boolean> {
 }
 
 // ---------- doughs ----------
+// Book doughs live in code. Saving a dough with a book dough's id stores an edited copy that
+// replaces it; "reset" deletes that copy. Removing a book dough only hides it, so it can come back.
+
+export interface DoughEntry {
+  formula: Formula;
+  kind: 'book' | 'mine';
+  /** Book dough with your own changes saved over it. */
+  edited: boolean;
+  hidden: boolean;
+}
+
+export async function doughLibrary(): Promise<DoughEntry[]> {
+  const s = await store.getSettings();
+  const mine = await store.listDoughs();
+  const byId = new Map(mine.map((d) => [d.id, d]));
+  const book: DoughEntry[] = PRESETS.map((p) => ({
+    formula: byId.get(p.id) ?? p,
+    kind: 'book',
+    edited: byId.has(p.id),
+    hidden: s.hiddenDoughIds.includes(p.id),
+  }));
+  const custom: DoughEntry[] = mine
+    .filter((d) => !isPresetId(d.id))
+    .map((d) => ({ formula: d, kind: 'mine', edited: false, hidden: false }));
+  return [...book, ...custom];
+}
+
+/** Doughs shown in the Plan picker. */
 export async function allDoughs(): Promise<Formula[]> {
-  return [...PRESETS, ...(await store.listDoughs())];
+  return (await doughLibrary()).filter((e) => !e.hidden).map((e) => e.formula);
 }
 
 export async function findDough(id: string): Promise<Formula> {
-  return (await allDoughs()).find((d) => d.id === id) ?? PRESETS[0];
+  const lib = await doughLibrary();
+  return lib.find((e) => e.formula.id === id)?.formula ?? lib.find((e) => !e.hidden)?.formula ?? PRESETS[0];
 }
 
 export function isPreset(f: Formula): boolean {
-  return PRESETS.some((p) => p.id === f.id);
+  return isPresetId(f.id);
 }
 
-/** Copy any dough into "My Doughs" so it can be edited. */
+/** The untouched book version of a book dough, for "reset". */
+export function bookOriginal(id: string): Formula | undefined {
+  return PRESETS.find((p) => p.id === id);
+}
+
+/** Start a new dough from any existing one (it keeps that dough's yeast schedule and sources). */
 export async function cloneDough(f: Formula, name: string): Promise<Formula> {
   const copy: Formula = structuredClone({ ...f, id: newId('my'), name, source: `Based on ${f.name}` });
   await store.saveDough(copy);
   return copy;
 }
 
+/** Save a dough. For a book dough this stores your edited version over the book one. */
 export const saveDough = store.saveDough;
-export const deleteDough = store.deleteDough;
+
+/** Undo your edits to a book dough. */
+export async function resetDough(id: string): Promise<void> {
+  if (isPresetId(id)) await store.deleteDough(id);
+}
+
+/** Delete your own dough, or hide a book dough. At least one dough always stays. */
+export async function removeDough(id: string): Promise<void> {
+  const lib = await doughLibrary();
+  const visible = lib.filter((e) => !e.hidden);
+  if (visible.length <= 1 && visible[0]?.formula.id === id) throw new Error('Keep at least one dough.');
+  const s = await store.getSettings();
+  const nextLast = s.lastDoughId === id ? visible.find((e) => e.formula.id !== id)!.formula.id : s.lastDoughId;
+  if (isPresetId(id)) {
+    await store.saveSettings({ ...s, hiddenDoughIds: [...new Set([...s.hiddenDoughIds, id])], lastDoughId: nextLast });
+  } else {
+    await store.deleteDough(id);
+    await store.saveSettings({ ...s, lastDoughId: nextLast });
+  }
+}
+
+/** Bring a hidden book dough back into the picker. */
+export async function restoreDough(id: string): Promise<void> {
+  const s = await store.getSettings();
+  await store.saveSettings({ ...s, hiddenDoughIds: s.hiddenDoughIds.filter((x) => x !== id) });
+}
+
+export { defaultBalls, DEFAULT_EAT_HOUR };
 
 /** Ball weight for a new diameter, keeping the thickness of a ball you already like. */
 export function ballForDiameter(refBallG: number, refDiameterIn: number, newDiameterIn: number): number {

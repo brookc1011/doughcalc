@@ -26,6 +26,8 @@ export interface Settings {
   lastBalls: BallGroup[];
   ovens: Oven[];
   lastOvenId: string;
+  /** Doughs removed from the picker. Book doughs are only hidden, so they can be restored. */
+  hiddenDoughIds: string[];
   lastBackupAt?: string;
   bakesSinceBackup: number;
   persisted?: boolean;

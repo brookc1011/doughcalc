@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { getSettings, requestPersistence, type Settings } from '../api';
 import { BatchScreen } from './BatchScreen';
+import { DoughEditor, DoughsScreen } from './DoughsScreen';
 import { HistoryScreen } from './HistoryScreen';
 import { PlanScreen } from './PlanScreen';
 import { SettingsScreen } from './SettingsScreen';
 
-export type Route = { name: 'plan' } | { name: 'history' } | { name: 'settings' } | { name: 'batch'; id: string };
+export type Route =
+  | { name: 'plan' }
+  | { name: 'history' }
+  | { name: 'settings' }
+  | { name: 'batch'; id: string }
+  | { name: 'doughs' }
+  | { name: 'dough'; id: string };
 
 export function App() {
   const [route, setRoute] = useState<Route>({ name: 'plan' });
@@ -32,7 +39,9 @@ export function App() {
       <main>
         {route.name === 'plan' && <PlanScreen settings={settings} go={setRoute} onSaved={reloadSettings} />}
         {route.name === 'history' && <HistoryScreen settings={settings} go={setRoute} />}
-        {route.name === 'settings' && <SettingsScreen settings={settings} onChange={reloadSettings} />}
+        {route.name === 'settings' && <SettingsScreen settings={settings} onChange={reloadSettings} go={setRoute} />}
+        {route.name === 'doughs' && <DoughsScreen go={setRoute} onChange={reloadSettings} />}
+        {route.name === 'dough' && <DoughEditor key={route.id} id={route.id} go={setRoute} onChange={reloadSettings} />}
         {route.name === 'batch' && (
           <BatchScreen id={route.id} settings={settings} go={setRoute} onSaved={reloadSettings} />
         )}
@@ -48,7 +57,11 @@ export function App() {
         >
           Bakes
         </button>
-        <button aria-current={route.name === 'settings' ? 'page' : undefined} className={route.name === 'settings' ? 'on' : ''} onClick={() => setRoute({ name: 'settings' })}>
+        <button
+          aria-current={['settings', 'doughs', 'dough'].includes(route.name) ? 'page' : undefined}
+          className={['settings', 'doughs', 'dough'].includes(route.name) ? 'on' : ''}
+          onClick={() => setRoute({ name: 'settings' })}
+        >
           Settings
         </button>
       </nav>

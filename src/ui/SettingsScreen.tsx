@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { exportBackup, fmtWhen, importBackup, saveSettings, type Settings } from '../api';
+import type { Route } from './App';
 import { cToF, fToC, shareOrDownload } from './common';
 
-export function SettingsScreen({ settings, onChange }: { settings: Settings; onChange: () => void }) {
+export function SettingsScreen({ settings, onChange, go }: { settings: Settings; onChange: () => void; go: (r: Route) => void }) {
   const [s, setS] = useState(settings);
   const [newOven, setNewOven] = useState('');
   const unit = s.unit;
@@ -18,6 +19,14 @@ export function SettingsScreen({ settings, onChange }: { settings: Settings; onC
   return (
     <div className="pad">
       <p className="eyebrow">Make yourself at home</p><h1>Settings</h1><p className="intro">Your kitchen, your defaults. Changes save as you go.</p>
+
+      <section className="card">
+        <h2>Doughs</h2>
+        <p className="muted small">Set how many balls each dough starts with, add your own doughs, or hide the book ones.</p>
+        <button className="small" onClick={() => go({ name: 'doughs' })}>
+          Manage doughs
+        </button>
+      </section>
 
       <section className="card">
         <label>

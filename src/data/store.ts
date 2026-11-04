@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastBalls: [{ count: 5, grams: 340, label: 'pizza' }],
   ovens: [{ id: 'home-oven', name: 'Home oven' }],
   lastOvenId: 'home-oven',
+  hiddenDoughIds: [],
   bakesSinceBackup: 0,
 };
 

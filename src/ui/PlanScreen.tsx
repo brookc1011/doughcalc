@@ -3,12 +3,15 @@ import {
   allDoughs,
   ballForDiameter,
   cloneDough,
+  DEFAULT_EAT_HOUR,
+  defaultBalls,
   defaultStageH,
   fmtGrams,
   isPreset,
   lockIn,
   makePlan,
   planIcs,
+  saveDough,
   STYLE_TF,
   STYLE_TF_SOURCE,
   type BallGroup,
@@ -39,10 +42,27 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const [manualYeast, setManualYeast] = useState('');
   const [edits, setEdits] = useState<{ hydration?: number; salt?: number }>({});
   const [saving, setSaving] = useState(false);
+  const [defaultsSaved, setDefaultsSaved] = useState(false);
+
+  /** Load a dough's own starting values: balls, eat-at time, mixer. */
+  const applyDefaults = (f: Formula) => {
+    setDoughId(f.id);
+    setBalls(defaultBalls(f));
+    setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR)));
+    setMixer(f.defaults?.mixer ?? settings.mixer);
+    setDefaultsSaved(false);
+  };
 
   useEffect(() => {
-    allDoughs().then(setDoughs);
+    allDoughs().then((list) => {
+      setDoughs(list);
+      const start = list.find((d) => d.id === settings.lastDoughId) ?? list[0];
+      if (start) applyDefaults(start);
+    });
   }, []);
+
+  // Any change after saving re-enables "Always start this dough this way".
+  useEffect(() => setDefaultsSaved(false), [balls, eatAt, mixer]);
 
   const base = doughs.find((d) => d.id === doughId) ?? doughs[0];
   const formula: Formula | undefined = base && { ...base, ...edits };
@@ -71,11 +91,21 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     setBalls(balls.map((b, j) => (j === i ? { ...b, ...patch } : b)));
 
   const pickDough = (id: string) => {
-    setDoughId(id);
     setEdits({});
     setStageH(undefined);
     const f = doughs.find((d) => d.id === id);
-    if (f) setBalls(balls.map((b) => (b.label === 'pizza' || balls.length === 1 ? { ...b, grams: f.ballG } : b)));
+    if (f) applyDefaults(f);
+  };
+
+  /** Save the current balls, eat-at hour and mixer as this dough's starting values. */
+  const saveDefaults = async () => {
+    if (!base) return;
+    await saveDough({
+      ...base,
+      defaults: { balls: balls.filter((b) => b.count > 0), eatHour: new Date(eatAt).getHours(), mixer },
+    });
+    setDoughs(await allDoughs());
+    setDefaultsSaved(true);
   };
 
   const saveAsMine = async () => {
@@ -110,7 +140,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
 
       <section className="card plan-inputs">
         <label>
-          Dough
+          <span className="row between">
+            Dough
+            <button type="button" className="link small" onClick={() => go({ name: 'doughs' })}>
+              Manage doughs
+            </button>
+          </span>
           <select value={doughId} onChange={(e) => pickDough(e.target.value)}>
             {doughs.map((d) => (
               <option key={d.id} value={d.id}>
@@ -164,6 +199,9 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         </div>
 
         </details>
+        <button type="button" className="link small" onClick={saveDefaults} disabled={defaultsSaved}>
+          {defaultsSaved ? `Saved as the starting point for ${formula.name}` : 'Always start this dough this way'}
+        </button>
         <label>
           Eat at
           <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />

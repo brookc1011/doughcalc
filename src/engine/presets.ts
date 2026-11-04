@@ -1,4 +1,4 @@
-import type { Formula, YeastAnchor } from './types';
+import type { BallGroup, Formula, YeastAnchor } from './types';
 
 // Source key used throughout: FWSY = Ken Forkish, "Flour Water Salt Yeast", page numbers from CJ's copy.
 
@@ -106,6 +106,20 @@ export const PRESETS: Formula[] = [
 
 export function getPreset(id: string): Formula | undefined {
   return PRESETS.find((p) => p.id === id);
+}
+
+export function isPresetId(id: string): boolean {
+  return PRESETS.some((p) => p.id === id);
+}
+
+/** Every Forkish pizza dough "makes five" balls (FWSY pp.218, 220, 225). */
+const BOOK_BALL_COUNT = 5;
+/** Dinner at 6 p.m. matches the book's same-day sample schedule ("anytime after 6 p.m.", FWSY p.218). */
+export const DEFAULT_EAT_HOUR = 18;
+
+/** Ball groups the Plan screen starts with for this dough. */
+export function defaultBalls(f: Formula): BallGroup[] {
+  return f.defaults?.balls?.length ? f.defaults.balls : [{ count: BOOK_BALL_COUNT, grams: f.ballG, label: 'pizza' }];
 }
 
 /** Thickness-factor bands (oz per sq in), PizzaBlab "Thickness Factor in Pizza Making". Shown in Details only. */

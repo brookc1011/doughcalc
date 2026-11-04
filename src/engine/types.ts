@@ -70,6 +70,15 @@ export interface Formula {
   teaspoons: TeaspoonNote[];
   /** Free text the baker keeps with this dough. */
   notes?: string;
+  /** What the Plan screen starts with when this dough is picked. */
+  defaults?: DoughDefaults;
+}
+
+export interface DoughDefaults {
+  balls: BallGroup[];
+  /** Hour of day (0-23) for the default "eat at" time. */
+  eatHour?: number;
+  mixer?: 'hand' | 'mixer';
 }
 
 export interface BallGroup {
