@@ -5,7 +5,7 @@ import { READY_WINDOW_SOURCE } from '../../src/ui/presentation';
 describe('help and attribution contracts', () => {
   it('retains every extracted explanation', () => {
     expect(Object.keys(HELP_COPY).sort()).toEqual([
-      'dough balls', 'kitchen adjustment', 'planning times', 'reminder privacy',
+      'dough balls', 'heads-up time', 'kitchen adjustment', 'planning times', 'reminder privacy',
       'room temperature', 'saved defaults', 'warm-up time', 'water temperature and friction', 'yeast override',
     ]);
     for (const text of Object.values(HELP_COPY)) expect(text.length).toBeGreaterThan(30);

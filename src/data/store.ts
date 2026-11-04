@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastOvenId: 'home-oven',
   hiddenDoughIds: [],
   bakesSinceBackup: 0,
+  reminderLeadMin: 0,
 };
 
 let dbPromise: Promise<IDBPDatabase<DoughDB>> | null = null;

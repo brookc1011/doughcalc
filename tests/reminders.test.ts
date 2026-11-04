@@ -54,6 +54,38 @@ describe('reminders', () => {
     }
   });
 
+  it('heads-up: each reminder is due that many minutes before its step, and says so', async () => {
+    const b = await lockFuture();
+    const steps = api.batchProgress(b).steps;
+    const plain = api.reminderItems(b, 0);
+    const early = api.reminderItems(b, 5);
+    expect(early.map((i) => Date.parse(i.at))).toEqual(plain.map((i) => Date.parse(i.at) - 5 * 60_000));
+    expect(early[0].body).toBe(`${b.planned.formula.name} · in 5 min`);
+    expect(plain[0].body).toBe(b.planned.formula.name);
+    expect(plain.map((i) => i.title)).toEqual(steps.map((s) => s.label));
+  });
+
+  it('heads-up: a step still ahead whose heads-up time has passed is sent right away; the cap is 60', async () => {
+    const b = await lockFuture();
+    const first = api.batchProgress(b).steps[0].at.getTime();
+    const now = first - 2 * 60_000; // step in 2 minutes, heads-up 5
+    expect(Date.parse(api.reminderItems(b, 5, now)[0].at)).toBe(now);
+    const capped = api.reminderItems(b, 500, first - 3 * 3600_000);
+    expect(Date.parse(capped[0].at)).toBe(first - 60 * 60_000);
+  });
+
+  it('changing the heads-up re-sends batches with reminders on', async () => {
+    const b = await lockFuture();
+    await api.remindersOn(b.id);
+    const before = push.sent.length;
+    const s = await api.setReminderLead(10);
+    expect(s.reminderLeadMin).toBe(10);
+    expect(push.sent.length).toBe(before + 1);
+    const plain = api.reminderItems(b, 0);
+    expect(push.sent.at(-1)!.items.map((i) => Date.parse(i.at))).toEqual(plain.map((i) => Date.parse(i.at) - 10 * 60_000));
+    expect((await api.setReminderLead(-3)).reminderLeadMin).toBe(0);
+  });
+
   it('a check-off with no signal is marked, then retried when back online', async () => {
     const b = await lockFuture();
     await api.remindersOn(b.id);

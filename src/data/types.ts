@@ -31,6 +31,8 @@ export interface Settings {
   lastBackupAt?: string;
   bakesSinceBackup: number;
   persisted?: boolean;
+  /** Heads-up: reminders buzz this many minutes before each step's time. 0 = at the step time. */
+  reminderLeadMin?: number;
   /** Random id naming this phone's reminder slot on the server. Created on first "Remind me". */
   pushDeviceId?: string;
 }

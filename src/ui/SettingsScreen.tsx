@@ -1,6 +1,6 @@
 import { HELP_COPY, WATER_SOURCES } from './helpCopy';
 import { useState } from 'react';
-import { exportBackup, fmtWhen, importBackup, saveSettings, type Settings } from '../api';
+import { exportBackup, fmtWhen, importBackup, saveSettings, setReminderLead, type Settings } from '../api';
 import type { Route } from './App';
 import { cToF, fToC, Info, NumField, shareOrDownload } from './common';
 
@@ -43,6 +43,24 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             <Info label="kitchen adjustment">{HELP_COPY["kitchen adjustment"]}</Info>
           </span>
           <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
+        </label>
+      </section>
+
+      <section className="card">
+        <h2>Reminders</h2>
+        <label>
+          <span>
+            Heads-up before each step (minutes)
+            <Info label="heads-up time">{HELP_COPY['heads-up time']}</Info>
+          </span>
+          <NumField
+            value={s.reminderLeadMin ?? 0}
+            onValue={async (n) => {
+              const next = await setReminderLead(n);
+              setS({ ...s, reminderLeadMin: next.reminderLeadMin });
+              onChange();
+            }}
+          />
         </label>
       </section>
 

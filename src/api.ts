@@ -307,18 +307,37 @@ export async function retryReminders(): Promise<number> {
   return fixed;
 }
 
+/** Longest heads-up allowed, minutes. A sanity cap chosen by Claude, not from a source. */
+export const MAX_REMINDER_LEAD_MIN = 60;
+
 /**
- * What a reminder carries: the step's name and the dough's name, nothing more.
+ * What a reminder carries: the step's name, the dough's name, and how much notice it gives. Nothing more.
  * (With the phone's push address, a random phone id and the batch id, that is all the server ever holds.)
+ * With a heads-up, each reminder is due leadMin before its step; a step still ahead whose heads-up time
+ * has already passed is sent right away.
  */
-export function reminderItems(b: Batch, now = Date.now()) {
+export function reminderItems(b: Batch, leadMin = 0, now = Date.now()) {
+  const lead = Math.min(Math.max(0, Math.round(leadMin)), MAX_REMINDER_LEAD_MIN);
   return batchProgress(b)
     .steps.filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
-    .map((s) => ({ at: s.at.toISOString(), title: s.label, body: b.planned.formula.name }));
+    .map((s) => ({
+      at: new Date(Math.max(s.at.getTime() - lead * 60_000, now)).toISOString(),
+      title: s.label,
+      body: lead ? `${b.planned.formula.name} · in ${lead} min` : b.planned.formula.name,
+    }));
+}
+
+/** Save the heads-up and re-send the times for every batch with reminders on. */
+export async function setReminderLead(min: number): Promise<Settings> {
+  const s = await store.getSettings();
+  const next = { ...s, reminderLeadMin: Math.min(Math.max(0, Math.round(min)), MAX_REMINDER_LEAD_MIN) };
+  await store.saveSettings(next);
+  for (const b of await store.listBatches()) if (b.actual.reminders) await pushSync(b);
+  return next;
 }
 
 async function sendReminders(b: Batch, device: string, askPermission: boolean): Promise<void> {
-  const items = reminderItems(b);
+  const items = reminderItems(b, (await store.getSettings()).reminderLeadMin ?? 0);
   if (items.length === 0) return cancelReminders(device, b.id);
   await scheduleReminders({ deviceId: device, batchId: b.id, items, askPermission });
 }
