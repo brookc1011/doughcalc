@@ -133,7 +133,8 @@ export async function exportAll(): Promise<ExportFile> {
     app: 'dough-app',
     schema: SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    settings: await getSettings(),
+    // The reminder id belongs to this phone; a restore on another phone must not share its server slot.
+    settings: (({ pushDeviceId: _omit, ...s }) => s)(await getSettings()) as Settings,
     doughs: await d.getAll('doughs'),
     batches: await d.getAll('batches'),
     photos: await Promise.all(photos.map(async (p) => ({ id: p.id, dataUrl: await blobToDataUrl(p.blob) }))),
@@ -146,15 +147,21 @@ export async function importAll(file: ExportFile): Promise<void> {
   if (file.schema > SCHEMA_VERSION) throw new Error('This backup is from a newer version of the app. Update the app first.');
   const d = await db();
   const tx = d.transaction(['settings', 'doughs', 'batches', 'photos'], 'readwrite');
+  // Keep this phone's own reminder id, never the one in the file (older backups carried it).
+  const ownDeviceId = ((await tx.objectStore('settings').get('settings')) as Settings | undefined)?.pushDeviceId;
   await Promise.all([
     tx.objectStore('settings').clear(),
     tx.objectStore('doughs').clear(),
     tx.objectStore('batches').clear(),
     tx.objectStore('photos').clear(),
   ]);
-  await tx.objectStore('settings').put({ ...DEFAULT_SETTINGS, ...file.settings });
+  const { pushDeviceId: _fromFile, ...settings } = file.settings;
+  await tx.objectStore('settings').put({ ...DEFAULT_SETTINGS, ...settings, pushDeviceId: ownDeviceId });
   for (const f of file.doughs) await tx.objectStore('doughs').put(f);
-  for (const b of file.batches) await tx.objectStore('batches').put(b);
+  // Restored batches start with reminders off on this phone; turn them back on per batch.
+  for (const b of file.batches) {
+    await tx.objectStore('batches').put({ ...b, actual: { ...b.actual, reminders: false, reminderSync: undefined } });
+  }
   for (const p of file.photos) await tx.objectStore('photos').put({ id: p.id, blob: dataUrlToBlob(p.dataUrl) });
   await tx.done;
 }

@@ -28,10 +28,15 @@ describe('help and attribution contracts', () => {
     expect(HELP_COPY['water temperature and friction']).toContain('4 × with a poolish');
     expect(HELP_COPY['water temperature and friction']).toContain('Friction is the heat mixing adds.');
   });
-  it('preserves reminder privacy and rescheduling disclosure', () => {
-    expect(HELP_COPY['reminder privacy']).toContain('Only that address and the step times');
-    expect(HELP_COPY['reminder privacy']).toContain('never your recipe or bakes');
-    expect(HELP_COPY['reminder privacy']).toContain('Checking a step off re-sends the new times.');
+  // Must match what api.reminderItems actually sends (tests/reminders.test.ts checks that side).
+  it('reminder privacy names everything the server holds, and what stays on the phone', () => {
+    const t = HELP_COPY['reminder privacy'];
+    for (const s of ['notification address', 'random ID for this phone', 'its name, its time and the dough’s name']) {
+      expect(t).toContain(s);
+    }
+    expect(t).toContain('Weights, notes, photos and ratings stay on your phone.');
+    expect(t).toContain('Checking a step off re-sends the times');
+    expect(t).not.toMatch(/only that address|never your recipe/i);
   });
   it('does not turn the yeast override into a required field or change its units', () => {
     expect(HELP_COPY['yeast override']).toContain('Leave blank.');

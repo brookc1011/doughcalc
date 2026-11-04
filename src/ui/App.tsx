@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getSettings, requestPersistence, type Settings } from '../api';
+import { getSettings, requestPersistence, retryReminders, type Settings } from '../api';
 import { BatchScreen } from './BatchScreen';
 import { DoughEditor, DoughsScreen } from './DoughsScreen';
 import { HistoryScreen } from './HistoryScreen';
@@ -58,6 +58,14 @@ export function App() {
     };
     navigator.serviceWorker?.addEventListener('message', onMsg);
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
+  }, []);
+
+  // Reminder updates that failed offline: retry on start and whenever the phone reconnects.
+  useEffect(() => {
+    const retry = () => void retryReminders().catch(() => undefined);
+    retry();
+    addEventListener('online', retry);
+    return () => removeEventListener('online', retry);
   }, []);
 
   useEffect(() => { window.scrollTo(0, 0); }, [route.name]);

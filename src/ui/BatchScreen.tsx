@@ -202,6 +202,12 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
               {msg}
             </p>
           )}
+          {batch.actual.reminderSync === 'pending' && (
+            <p className="warn" role="status">
+              Reminders may be out of date: the last update didn’t reach the server. The app retries when you’re back
+              online.
+            </p>
+          )}
         </div>
       )}
 

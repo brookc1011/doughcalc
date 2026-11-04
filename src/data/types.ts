@@ -68,6 +68,8 @@ export interface Actual {
   done?: Record<string, string>;
   /** Whether phone reminders are on for this batch. */
   reminders?: boolean;
+  /** Set when the last reminder update didn't reach the server (e.g. no signal); retried later. */
+  reminderSync?: 'pending';
 }
 
 export interface BakeSession {

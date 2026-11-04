@@ -235,8 +235,7 @@ export async function checkStep(batchId: string, key: string, at: Date = new Dat
   if (key === 'ball') actual.ballAt = iso;
   const next = { ...b, actual };
   await store.saveBatch(next);
-  await syncReminders(next);
-  return next;
+  return syncReminders(next);
 }
 
 export async function uncheckStep(batchId: string, key: string): Promise<Batch> {
@@ -251,8 +250,7 @@ export async function uncheckStep(batchId: string, key: string): Promise<Batch> 
   if (key === 'ball' && actual.ballAt === was) delete actual.ballAt;
   const next = { ...b, actual };
   await store.saveBatch(next);
-  await syncReminders(next);
-  return next;
+  return syncReminders(next);
 }
 
 // ---------- reminders ----------
@@ -262,7 +260,8 @@ export { pushSupported, pushPermission };
 export async function remindersOn(batchId: string): Promise<Batch> {
   const b = await store.getBatch(batchId);
   if (!b) throw new Error('Batch not found');
-  const next = { ...b, actual: { ...b.actual, reminders: true } };
+  // Turning on is the one time we ask for permission, so its errors go to the screen instead of the retry queue.
+  const next = { ...b, actual: { ...b.actual, reminders: true, reminderSync: undefined } };
   await sendReminders(next, await deviceId(), true);
   await store.saveBatch(next);
   return next;
@@ -271,24 +270,55 @@ export async function remindersOn(batchId: string): Promise<Batch> {
 export async function remindersOff(batchId: string): Promise<Batch> {
   const b = await store.getBatch(batchId);
   if (!b) throw new Error('Batch not found');
-  const next = { ...b, actual: { ...b.actual, reminders: false } };
+  return pushSync({ ...b, actual: { ...b.actual, reminders: false } });
+}
+
+/** Resend remaining steps after a check-off. */
+async function syncReminders(b: Batch): Promise<Batch> {
+  if (!b.actual.reminders && !b.actual.reminderSync) return b;
+  return pushSync(b);
+}
+
+/**
+ * Bring the server in line with this batch: send its remaining steps (reminders on) or clear them (off).
+ * If that fails (no signal), the batch is marked so the app retries later and can warn that reminders
+ * may be out of date. The checklist itself never waits on the server.
+ */
+async function pushSync(b: Batch): Promise<Batch> {
+  let ok = true;
+  try {
+    const device = await deviceId();
+    if (b.actual.reminders) await sendReminders(b, device, false);
+    else await cancelReminders(device, b.id);
+  } catch {
+    ok = false;
+  }
+  const actual: Actual = { ...b.actual, reminderSync: ok ? undefined : 'pending' };
+  const next = { ...b, actual };
   await store.saveBatch(next);
-  await cancelReminders(await deviceId(), batchId).catch(() => undefined);
   return next;
 }
 
-/** Resend remaining steps after a check-off. Failures are swallowed: the checklist still works offline. */
-async function syncReminders(b: Batch): Promise<void> {
-  if (!b.actual.reminders) return;
-  await sendReminders(b, await deviceId(), false).catch(() => undefined);
+/** Retry any reminder updates that failed earlier. Call on app start and when the phone reconnects. */
+export async function retryReminders(): Promise<number> {
+  const pending = (await store.listBatches()).filter((b) => b.actual.reminderSync === 'pending');
+  let fixed = 0;
+  for (const b of pending) if (!(await pushSync(b)).actual.reminderSync) fixed++;
+  return fixed;
+}
+
+/**
+ * What a reminder carries: the step's name and the dough's name, nothing more.
+ * (With the phone's push address, a random phone id and the batch id, that is all the server ever holds.)
+ */
+export function reminderItems(b: Batch, now = Date.now()) {
+  return batchProgress(b)
+    .steps.filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
+    .map((s) => ({ at: s.at.toISOString(), title: s.label, body: b.planned.formula.name }));
 }
 
 async function sendReminders(b: Batch, device: string, askPermission: boolean): Promise<void> {
-  const prog = batchProgress(b);
-  const now = Date.now();
-  const items = prog.steps
-    .filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
-    .map((s) => ({ at: s.at.toISOString(), title: s.label, body: `${b.planned.formula.name}: ${s.detail}` }));
+  const items = reminderItems(b);
   if (items.length === 0) return cancelReminders(device, b.id);
   await scheduleReminders({ deviceId: device, batchId: b.id, items, askPermission });
 }
@@ -405,7 +435,14 @@ export async function exportBackup(): Promise<{ filename: string; json: string }
 }
 
 export async function importBackup(json: string): Promise<void> {
+  // Batches with reminders on before the restore: clear them on the server too (best effort), since the
+  // restore replaces them and restored batches start with reminders off.
+  const before = (await store.listBatches()).filter((b) => b.actual.reminders);
   await store.importAll(JSON.parse(json));
+  const s = await store.getSettings();
+  if (s.pushDeviceId) {
+    for (const b of before) await cancelReminders(s.pushDeviceId, b.id).catch(() => undefined);
+  }
 }
 
 // ---------- display helpers ----------
