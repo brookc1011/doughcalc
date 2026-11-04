@@ -16,7 +16,7 @@ import {
   type Survey,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, RecipeView, shareOrDownload, Timeline, toLocalInput } from './common';
+import { Chips, cToF, download, fToC, NumField, RecipeView, shareOrDownload, Timeline, toLocalInput } from './common';
 
 export function BatchScreen({
   id,
@@ -249,7 +249,7 @@ function RateForm({
         </label>
         <label>
           Balls baked
-          <input type="number" min={1} value={balls} onChange={(e) => setBalls(Number(e.target.value))} style={{ width: '5em' }} />
+          <NumField value={balls} onValue={setBalls} style={{ width: '5em' }} />
         </label>
       </div>
       <details className="optional-notes"><summary>Add a note or photo (optional)</summary>

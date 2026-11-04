@@ -16,6 +16,7 @@ import {
   type Formula,
 } from '../api';
 import type { Route } from './App';
+import { NumField } from './common';
 
 export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChange: () => void }) {
   const [lib, setLib] = useState<DoughEntry[]>([]);
@@ -210,9 +211,9 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <input type="number" min={0} value={b.count} aria-label="Count" onChange={(e) => setBall(i, { count: Number(e.target.value) })} />
+            <NumField value={b.count} aria-label="Count" onValue={(n) => setBall(i, { count: n })} />
             <span>×</span>
-            <input type="number" min={50} value={b.grams} aria-label="Grams each" onChange={(e) => setBall(i, { grams: Number(e.target.value) })} />
+            <NumField value={b.grams} aria-label="Grams each" onValue={(n) => setBall(i, { grams: n })} />
             <span>g</span>
             <input
               className="ball-label"
@@ -260,31 +261,31 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
         <div className="row">
           <label className="grow">
             Water %
-            <input type="number" step={0.5} value={pct(f.hydration)} onChange={(e) => patch({ hydration: Number(e.target.value) / 100 })} />
+            <NumField value={pct(f.hydration)} onValue={(n) => patch({ hydration: n / 100 })} />
           </label>
           <label className="grow">
             Salt %
-            <input type="number" step={0.1} value={pct(f.salt)} onChange={(e) => patch({ salt: Number(e.target.value) / 100 })} />
+            <NumField value={pct(f.salt)} onValue={(n) => patch({ salt: n / 100 })} />
           </label>
         </div>
         <div className="row">
           <label className="grow">
             Olive oil %
-            <input type="number" step={0.5} value={pct(f.oil)} onChange={(e) => patch({ oil: Number(e.target.value) / 100 })} />
+            <NumField value={pct(f.oil)} onValue={(n) => patch({ oil: n / 100 })} />
           </label>
           <label className="grow">
             Sugar %
-            <input type="number" step={0.5} value={pct(f.sugar)} onChange={(e) => patch({ sugar: Number(e.target.value) / 100 })} />
+            <NumField value={pct(f.sugar)} onValue={(n) => patch({ sugar: n / 100 })} />
           </label>
         </div>
         <div className="row">
           <label className="grow">
             Reference ball (g)
-            <input type="number" value={f.ballG} onChange={(e) => patch({ ballG: Number(e.target.value) })} />
+            <NumField value={f.ballG} onValue={(n) => patch({ ballG: n })} />
           </label>
           <label className="grow">
             for a pizza of (in)
-            <input type="number" value={f.ballDiameterIn} onChange={(e) => patch({ ballDiameterIn: Number(e.target.value) })} />
+            <NumField value={f.ballDiameterIn} onValue={(n) => patch({ ballDiameterIn: n })} />
           </label>
         </div>
         <p className="muted small">

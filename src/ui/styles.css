@@ -146,7 +146,7 @@ input,select,textarea {
   font-size:1rem;
   font-weight:500;
 }
-input[type=number],input[type=datetime-local] {
+input[type=number],input[inputmode=decimal],input[type=datetime-local] {
   font-variant-numeric:tabular-nums;
 }
 input[type=datetime-local] {
@@ -201,7 +201,7 @@ input::file-selector-button {
   gap:8px;
   margin:8px 0;
 }
-.ball input[type=number] {
+.ball input[type=number],.ball input[inputmode=decimal] {
   flex:1 1 60px;
   font-size:1.25rem;
   font-weight:650;

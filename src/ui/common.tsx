@@ -1,3 +1,4 @@
+import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import {
   fmtGrams,
   fmtPct,
@@ -6,6 +7,49 @@ import {
   stepCalendarLink,
   type Plan,
 } from '../api';
+
+type NumFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+  value: number;
+  onValue: (n: number) => void;
+};
+
+/**
+ * Number box that behaves on a phone: clearing it leaves it empty instead of showing 0,
+ * no leading zeros ("02"), and tapping it selects the number so you can type over it.
+ * The last valid number is kept while the box is blank and restored if you leave it blank.
+ */
+export function NumField({ value, onValue, onFocus, onBlur, ...rest }: NumFieldProps) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    if (text === '' || Number(text) !== value) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      {...rest}
+      // Plain text with the number keypad: a type="number" box rewrites partial entries like "70." while typing.
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onFocus={(e) => {
+        e.currentTarget.select();
+        onFocus?.(e);
+      }}
+      onChange={(e) => {
+        // Commas from some keypads count as decimal points; drop anything else that isn't part of a number.
+        const raw = e.target.value.replace(',', '.').replace(/[^\d.-]/g, '').replace(/^0+(?=\d)/, '');
+        setText(raw);
+        if (raw !== '' && !Number.isNaN(Number(raw))) onValue(Number(raw));
+      }}
+      onBlur={(e) => {
+        if (text === '' || Number.isNaN(Number(text))) setText(String(value));
+        onBlur?.(e);
+      }}
+    />
+  );
+}
 
 type Recipe = Plan['recipe'];
 type Yeast = Plan['yeast'];

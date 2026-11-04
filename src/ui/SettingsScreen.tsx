@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { exportBackup, fmtWhen, importBackup, saveSettings, type Settings } from '../api';
 import type { Route } from './App';
-import { cToF, fToC, shareOrDownload } from './common';
+import { cToF, fToC, NumField, shareOrDownload } from './common';
 
 export function SettingsScreen({ settings, onChange, go }: { settings: Settings; onChange: () => void; go: (r: Route) => void }) {
   const [s, setS] = useState(settings);
@@ -38,19 +38,12 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         </label>
         <label>
           Warm-up out of the fridge (hours)
-          <input type="number" step={0.25} value={s.warmUpH} onChange={(e) => save({ ...s, warmUpH: Number(e.target.value) })} />
+          <NumField value={s.warmUpH} onValue={(n) => save({ ...s, warmUpH: n })} />
           <span className="muted small">PizzaBlab: typically 0.5-3 h, until the ball is at least 50°F.</span>
         </label>
         <label>
           Kitchen adjustment (yeast multiplier)
-          <input
-            type="number"
-            step={0.05}
-            min={0.5}
-            max={2}
-            value={s.kitchenFactor}
-            onChange={(e) => save({ ...s, kitchenFactor: Number(e.target.value) })}
-          />
+          <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
           <span className="muted small">1 = as calculated. Below 1 if your dough keeps running early, above 1 if late.</span>
         </label>
       </section>
@@ -63,21 +56,21 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <div className="row">
           <label className="grow">
             From (°{unit})
-            <input type="number" value={show(s.bandLowF)} onChange={(e) => save({ ...s, bandLowF: store(e.target.value) })} />
+            <NumField value={show(s.bandLowF)} onValue={(n) => save({ ...s, bandLowF: store(String(n)) })} />
           </label>
           <label className="grow">
             To (°{unit})
-            <input type="number" value={show(s.bandHighF)} onChange={(e) => save({ ...s, bandHighF: store(e.target.value) })} />
+            <NumField value={show(s.bandHighF)} onValue={(n) => save({ ...s, bandHighF: store(String(n)) })} />
           </label>
         </div>
         <div className="row">
           <label className="grow">
             Hand friction (°F)
-            <input type="number" value={s.frictionHandF} onChange={(e) => save({ ...s, frictionHandF: Number(e.target.value) })} />
+            <NumField value={s.frictionHandF} onValue={(n) => save({ ...s, frictionHandF: n })} />
           </label>
           <label className="grow">
             Mixer friction (°F)
-            <input type="number" value={s.frictionMixerF} onChange={(e) => save({ ...s, frictionMixerF: Number(e.target.value) })} />
+            <NumField value={s.frictionMixerF} onValue={(n) => save({ ...s, frictionMixerF: n })} />
           </label>
         </div>
         <p className="muted small">Defaults are assumptions inside King Arthur's ranges: 0-4°F gentle folds, 22-24°F KitchenAid.</p>

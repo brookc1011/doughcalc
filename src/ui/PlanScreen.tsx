@@ -19,7 +19,7 @@ import {
   type Settings,
 } from '../api';
 import type { Route } from './App';
-import { cToF, download, fToC, RecipeView, Timeline, toLocalInput } from './common';
+import { cToF, download, fToC, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
 function tomorrowAt(hour: number): Date {
   const d = new Date();
@@ -158,21 +158,9 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         <div className="label">Dough balls <span className="field-hint">count × grams each</span></div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <input
-              type="number"
-              min={0}
-              value={b.count}
-              onChange={(e) => setBall(i, { count: Number(e.target.value) })}
-              aria-label="Count"
-            />
+            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label="Count" />
             <span>×</span>
-            <input
-              type="number"
-              min={50}
-              value={b.grams}
-              onChange={(e) => setBall(i, { grams: Number(e.target.value) })}
-              aria-label="Grams each"
-            />
+            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label="Grams each" />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -208,7 +196,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         </label>
         <label>
           Room temperature (°{unit})
-          <input type="number" value={room} onChange={(e) => setRoom(Number(e.target.value))} />
+          <NumField value={room} onValue={setRoom} />
         </label>
       </section>
 
@@ -226,12 +214,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </label>
           <label>
             {stageLabel}
-            <input
-              type="number"
-              step={0.5}
-              value={stageH ?? defaultStageH(formula)}
-              onChange={(e) => setStageH(Number(e.target.value))}
-            />
+            <NumField value={stageH ?? defaultStageH(formula)} onValue={setStageH} />
           </label>
           <label>
             Fixed mix time (optional)
@@ -250,21 +233,14 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           <div className="row">
             <label className="grow">
               Hydration %
-              <input
-                type="number"
-                step={0.5}
+              <NumField
                 value={+(formula.hydration * 100).toFixed(1)}
-                onChange={(e) => setEdits({ ...edits, hydration: Number(e.target.value) / 100 })}
+                onValue={(n) => setEdits({ ...edits, hydration: n / 100 })}
               />
             </label>
             <label className="grow">
               Salt %
-              <input
-                type="number"
-                step={0.1}
-                value={+(formula.salt * 100).toFixed(2)}
-                onChange={(e) => setEdits({ ...edits, salt: Number(e.target.value) / 100 })}
-              />
+              <NumField value={+(formula.salt * 100).toFixed(2)} onValue={(n) => setEdits({ ...edits, salt: n / 100 })} />
             </label>
           </div>
           {(edited || isPreset(formula)) && (
