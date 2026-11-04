@@ -1,4 +1,4 @@
-import { BATCH_TARGETS, HOME_SCREEN_HELP, reminderStatus, stepPresentation } from './presentation';
+import { BATCH_TARGETS, HOME_SCREEN_HELP, reminderStatus, stepPresentation, stepTimeText } from './presentation';
 import { HELP_COPY } from './helpCopy';
 import { useEffect, useState } from 'react';
 import {
@@ -148,6 +148,8 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
   const remindOn = !!batch.actual.reminders;
   const perm = pushPermission();
   const allDone = !prog.nextKey;
+  // Before anything is ticked, the first step starts whenever you do.
+  const firstUntouched = prog.steps.some((s) => s.doneAt || s.passed) ? undefined : prog.steps[0]?.key;
 
   const check = async (key: string, at?: Date) => {
     setPickFor(null);
@@ -231,9 +233,12 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
                   </button>
                 )}
               </div>
-              <div className="step-time">
-                {s.doneAt ? `Done ${fmtWhen(s.doneAt)}` : s.passed ? 'Not ticked' : fmtWhen(s.at)}
-              </div>
+              <div className="step-time">{stepTimeText(s, firstUntouched === s.key, fmtWhen)}</div>
+              {firstUntouched === s.key && (
+                <div className="muted small">
+                  Planned for {fmtWhen(s.at)}. The steps after it follow from when you tap Done.
+                </div>
+              )}
               {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.detail}</div>}
               {!s.doneAt && !s.passed && (
                 <div className="step-actions">

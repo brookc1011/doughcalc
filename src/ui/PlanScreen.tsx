@@ -1,4 +1,4 @@
-import { READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation';
+import { defaultStart, READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation';
 import { HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -29,12 +29,6 @@ function tomorrowAt(hour: number): Date {
   return d;
 }
 
-/** Now, rounded up to the next quarter hour. */
-function soon(): Date {
-  const d = new Date();
-  d.setMinutes(Math.ceil((d.getMinutes() + 1) / 15) * 15, 0, 0);
-  return d;
-}
 
 const TIMING_OPTIONS: { v: TimingMode; label: string }[] = [
   { v: 'eat', label: 'Eat at' },
@@ -55,7 +49,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const [balls, setBalls] = useState<BallGroup[]>(settings.lastBalls);
   const [eatAt, setEatAt] = useState(toLocalInput(tomorrowAt(18)));
   const [timing, setTiming] = useState<TimingMode>('eat');
-  const [startAt, setStartAt] = useState(toLocalInput(soon()));
+  const [startAt, setStartAt] = useState(toLocalInput(defaultStart()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
   const [mixer, setMixer] = useState<'hand' | 'mixer'>(settings.mixer);
   const [details, setDetails] = useState(false);

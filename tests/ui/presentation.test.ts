@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { HOME_SCREEN_HELP, infoLabel, reminderStatus, stepPresentation, TIMING_HINTS } from '../../src/ui/presentation';
+import {
+  defaultStart,
+  HOME_SCREEN_HELP,
+  infoLabel,
+  reminderStatus,
+  START_LEAD_MIN,
+  START_WHEN_READY,
+  stepPresentation,
+  stepTimeText,
+  TIMING_HINTS,
+} from '../../src/ui/presentation';
+
+describe('start-time breathing room', () => {
+  const at = (s: string) => new Date(s);
+  it('default start is at least 15 minutes out, on a quarter hour', () => {
+    expect(START_LEAD_MIN).toBe(15);
+    expect(defaultStart(at('2026-11-04T12:20:00')).getTime()).toBe(at('2026-11-04T12:45:00').getTime());
+    expect(defaultStart(at('2026-11-04T12:30:00')).getTime()).toBe(at('2026-11-04T12:45:00').getTime());
+    expect(defaultStart(at('2026-11-04T12:30:01')).getTime()).toBe(at('2026-11-04T13:00:00').getTime());
+    expect(defaultStart(at('2026-11-04T23:50:00')).getTime()).toBe(at('2026-11-05T00:15:00').getTime());
+  });
+  it('the first untouched step says start when ready; others keep their time', () => {
+    const fmt = (d: Date) => d.toISOString();
+    const step = { key: 'autolyse' as const, at: at('2026-11-04T12:45:00Z') };
+    expect(stepTimeText(step, true, fmt)).toBe(START_WHEN_READY);
+    expect(stepTimeText(step, false, fmt)).toBe('2026-11-04T12:45:00.000Z');
+    expect(stepTimeText({ ...step, doneAt: at('2026-11-04T12:50:00Z') }, true, fmt)).toBe('Done 2026-11-04T12:50:00.000Z');
+    expect(stepTimeText({ ...step, passed: true }, false, fmt)).toBe('Not ticked');
+  });
+});
 
 describe('checklist presentation preserves engine state precedence', () => {
   it('shows completed even if passed and next flags are also present', () => {
