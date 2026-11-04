@@ -6,20 +6,19 @@ import {
   DEFAULT_EAT_HOUR,
   defaultBalls,
   defaultStageH,
-  fmtGrams,
+  fmtWhen,
   isPreset,
   lockIn,
   makePlan,
   planIcs,
   saveDough,
-  STYLE_TF,
-  STYLE_TF_SOURCE,
   type BallGroup,
   type Formula,
   type Settings,
+  type TimingMode,
 } from '../api';
 import type { Route } from './App';
-import { cToF, download, fToC, NumField, RecipeView, Timeline, toLocalInput } from './common';
+import { Chips, cToF, download, fToC, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
 function tomorrowAt(hour: number): Date {
   const d = new Date();
@@ -28,12 +27,33 @@ function tomorrowAt(hour: number): Date {
   return d;
 }
 
+/** Now, rounded up to the next quarter hour. */
+function soon(): Date {
+  const d = new Date();
+  d.setMinutes(Math.ceil((d.getMinutes() + 1) / 15) * 15, 0, 0);
+  return d;
+}
+
+const TIMING_OPTIONS: { v: TimingMode; label: string }[] = [
+  { v: 'eat', label: 'Eat at' },
+  { v: 'start', label: 'Start at' },
+  { v: 'both', label: 'Both' },
+];
+
+const TIMING_INTRO: Record<TimingMode, string> = {
+  eat: 'Pick your dough. We’ll work back from dinner.',
+  start: 'Pick your dough. We’ll tell you when it’s ready.',
+  both: 'Pick your dough. We’ll fit it between start and dinner.',
+};
+
 export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
   const unit = settings.unit;
   const [doughs, setDoughs] = useState<Formula[]>([]);
   const [doughId, setDoughId] = useState(settings.lastDoughId);
   const [balls, setBalls] = useState<BallGroup[]>(settings.lastBalls);
   const [eatAt, setEatAt] = useState(toLocalInput(tomorrowAt(18)));
+  const [timing, setTiming] = useState<TimingMode>('eat');
+  const [startAt, setStartAt] = useState(toLocalInput(soon()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
   const [mixer, setMixer] = useState<'hand' | 'mixer'>(settings.mixer);
   const [details, setDetails] = useState(false);
@@ -48,7 +68,8 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const applyDefaults = (f: Formula) => {
     setDoughId(f.id);
     setBalls(defaultBalls(f));
-    setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR)));
+    // In Start or Both mode the times you typed stay put when you switch dough.
+    if (timing === 'eat') setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR)));
     setMixer(f.defaults?.mixer ?? settings.mixer);
     setDefaultsSaved(false);
   };
@@ -68,22 +89,33 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const formula: Formula | undefined = base && { ...base, ...edits };
   const edited = Object.keys(edits).length > 0;
 
-  const plan = useMemo(() => {
-    if (!formula) return null;
-    return makePlan(
+  const planFor = (f: Formula, ownStage = true) =>
+    makePlan(
       {
-        formula,
+        formula: f,
         balls,
         eatAt: new Date(eatAt),
         roomF: unit === 'F' ? room : cToF(room),
-        stageH,
+        stageH: ownStage ? stageH : undefined,
         mixer,
-        mixAt: mixAt ? new Date(mixAt) : undefined,
+        mixAt: timing === 'eat' && mixAt ? new Date(mixAt) : undefined,
+        timing,
+        startAt: timing === 'eat' ? undefined : new Date(startAt),
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
       },
       settings,
     );
-  }, [formula, balls, eatAt, room, stageH, mixer, mixAt, manualYeast, settings, unit]);
+
+  const plan = useMemo(
+    () => (formula ? planFor(formula) : null),
+    [formula, balls, eatAt, room, stageH, mixer, mixAt, timing, startAt, manualYeast, settings, unit],
+  );
+
+  // When start and eat times don't fit this dough, list the other doughs that do.
+  const fitting = useMemo(() => {
+    if (!plan || timing !== 'both' || plan.errors.length === 0) return [];
+    return doughs.filter((d) => d.id !== doughId && planFor(d, false).errors.length === 0);
+  }, [plan, doughs, doughId]);
 
   if (!formula || !plan) return <p className="pad">Loading…</p>;
 
@@ -136,7 +168,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     <div className="pad">
       <p className="eyebrow">A little planning. Great pizza.</p>
       <h1>Plan a bake</h1>
-      <p className="intro">Pick your dough. We’ll work back from dinner.</p>
+      <p className="intro">{TIMING_INTRO[timing]}</p>
 
       <section className="card plan-inputs">
         <label>
@@ -190,10 +222,28 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         <button type="button" className="link small" onClick={saveDefaults} disabled={defaultsSaved}>
           {defaultsSaved ? `Saved as the starting point for ${formula.name}` : 'Always start this dough this way'}
         </button>
-        <label>
-          Eat at
-          <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
-        </label>
+        <div className="label">Plan around</div>
+        <Chips value={timing} options={TIMING_OPTIONS} onChange={setTiming} />
+        {timing !== 'eat' && (
+          <label>
+            Start at <span className="field-hint">{formula.family === 'poolish' ? 'mixing the poolish' : 'first step'}</span>
+            <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+          </label>
+        )}
+        {timing !== 'start' && (
+          <label>
+            Eat at
+            <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
+          </label>
+        )}
+        {plan.window && (
+          <p className="muted small">
+            From this start, {formula.name} is ready {fmtWhen(plan.window.earliest)} at the earliest. The balls keep in the
+            fridge until {fmtWhen(plan.window.latest)} with the same yeast (FWSY p.219)
+            {timing === 'start' ? ', so you can eat any time between.' : '.'}
+          </p>
+        )}
+        {plan.fitNote && <p className="small">{plan.fitNote}</p>}
         <label>
           Room temperature (°{unit})
           <NumField value={room} onValue={setRoom} />
@@ -216,10 +266,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             {stageLabel}
             <NumField value={stageH ?? defaultStageH(formula)} onValue={setStageH} />
           </label>
-          <label>
-            Fixed mix time (optional)
-            <input type="datetime-local" value={mixAt} onChange={(e) => setMixAt(e.target.value)} />
-          </label>
+          {timing === 'eat' && (
+            <label>
+              Fixed mix time (optional)
+              <input type="datetime-local" value={mixAt} onChange={(e) => setMixAt(e.target.value)} />
+            </label>
+          )}
           <label>
             Yeast % override (optional)
             <input
@@ -248,19 +300,6 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
               Save as My Dough
             </button>
           )}
-          <details>
-            <summary className="small">Style thickness reference</summary>
-            <p className="muted small">
-              Your current ball: {fmtGrams(formula.ballG)} for {formula.ballDiameterIn}". Bands from {STYLE_TF_SOURCE}, oz per sq in.
-            </p>
-            <ul className="small">
-              {STYLE_TF.map((t) => (
-                <li key={t.style}>
-                  {t.style}: {t.low === t.high ? t.low : `${t.low}-${t.high}`}
-                </li>
-              ))}
-            </ul>
-          </details>
         </section>
       )}
 
@@ -269,6 +308,19 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           {e}
         </p>
       ))}
+      {fitting.length > 0 && (
+        <section className="card">
+          <p className="small">These doughs fit your start and eat times on the book schedule:</p>
+          {fitting.map((d) => (
+            <div className="row between" key={d.id}>
+              <span>{d.name}</span>
+              <button className="small" onClick={() => pickDough(d.id)}>
+                Use it
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       <RecipeView recipe={plan.recipe} yeast={plan.yeast} water={plan.water} unit={unit} />
       <Timeline

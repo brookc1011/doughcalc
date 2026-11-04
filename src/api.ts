@@ -3,7 +3,7 @@
 import { readyTally, suggestions, topSuggestion, type ReadyTally, type Suggestion, type Survey } from './engine/advice';
 import { googleCalendarLink, stepsToIcs } from './engine/calendar';
 import { rescaleBall, roundArea } from './engine/geometry';
-import { defaultStageH, planBatch, type Plan } from './engine/plan';
+import { defaultStageH, planBatch, type Plan, type TimingMode } from './engine/plan';
 import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
 import type { BallGroup, DoughDefaults, Formula, Ingredient } from './engine/types';
@@ -11,7 +11,7 @@ import { downscalePhoto } from './data/photo';
 import * as store from './data/store';
 import type { Actual, BakeSession, Batch, Oven, Settings, StepRecord } from './data/types';
 
-export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, ReadyTally, Settings, Suggestion, Survey };
+export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, ReadyTally, Settings, Suggestion, Survey, TimingMode };
 export { PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
 
 /** Backup reminder cadence, in bake sessions. */
@@ -132,6 +132,9 @@ export interface PlanForm {
   stageH?: number;
   mixer: 'hand' | 'mixer';
   mixAt?: Date;
+  /** eat: work back from eatAt. start: start at startAt, eat when ready. both: fit between the two. */
+  timing?: TimingMode;
+  startAt?: Date;
   manualYeastPct?: number;
 }
 
@@ -144,6 +147,8 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
     stageH: form.stageH,
     warmUpH: s.warmUpH,
     mixAt: form.mixAt,
+    timing: form.timing,
+    startAt: form.startAt,
     manualYeastPct: form.manualYeastPct,
     kitchenFactor: s.kitchenFactor,
     temp: {

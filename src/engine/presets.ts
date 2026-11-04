@@ -54,7 +54,8 @@ export const PRESETS: Formula[] = [
     id: 'forkish-same-day',
     name: 'Forkish Same-Day Straight',
     source: 'FWSY pp.218-219',
-    process: { autolyseMin: 25, foldAfterMin: 45, minProofH: 1.5, proofInFridge: false, maxHoldH: 48 },
+    // stageH 6: the book's same-day bulk (FWSY p.218); without it the plan fell back to the overnight 12 h.
+    process: { autolyseMin: 25, foldAfterMin: 45, stageH: 6, minProofH: 1.5, proofInFridge: false, maxHoldH: 48 },
     teaspoons: [
       { grams: 2, text: '1/2 tsp', source: 'FWSY p.218' },
       { grams: 20, text: '1 tbsp + 3/4 tsp', source: 'FWSY p.218' },

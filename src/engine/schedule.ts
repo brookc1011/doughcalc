@@ -31,6 +31,37 @@ const H = 3600_000;
 const M = 60_000;
 const add = (d: Date, ms: number) => new Date(d.getTime() + ms);
 
+/** Hours from the first step (poolish or autolyse) to mixing. */
+export function leadH(f: Formula, stageH: number): number {
+  return f.family === 'poolish' ? stageH : f.process.autolyseMin / 60;
+}
+
+export interface EatWindow {
+  mixAt: Date;
+  /** Soonest the balls are ready to bake. */
+  earliest: Date;
+  /** Latest the book keeps the balls (fridge hold after balling). */
+  latest: Date;
+}
+
+/**
+ * Starting at `startAt` (the first step), when can you eat? The bulk stays at the book time;
+ * the slack is a fridge hold after balling, which FWSY allows for up to maxHoldH without
+ * changing the yeast (FWSY p.219).
+ */
+export function eatWindow(f: Formula, startAt: Date, stageH: number, warmUpH: number): EatWindow {
+  const p = f.process;
+  const bulkH = f.family === 'poolish' ? (p.finalBulkH ?? 0) : stageH;
+  const fridge = p.proofInFridge;
+  const mixAt = add(startAt, leadH(f, stageH) * H);
+  const ball = add(mixAt, bulkH * H);
+  return {
+    mixAt,
+    earliest: add(ball, (p.minProofH + (fridge ? warmUpH : 0)) * H),
+    latest: add(ball, (p.maxHoldH + (fridge ? warmUpH : 0)) * H),
+  };
+}
+
 export function buildSchedule(input: ScheduleInput): Schedule {
   const { formula: f, eatAt, stageH, warmUpH } = input;
   const p = f.process;

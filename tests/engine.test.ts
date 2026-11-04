@@ -198,6 +198,74 @@ describe('schedule', () => {
   });
 });
 
+describe('timing modes', () => {
+  const base = {
+    balls: [{ count: 5, grams: 340 }],
+    eatAt: new Date('2026-11-08T18:00:00'),
+    roomF: 70,
+    warmUpH: 1.5,
+    temp: { bandLowF: 66, bandHighF: 74, frictionF: 2 },
+  };
+  const H = 3600_000;
+
+  it('same-day dough defaults to its own 6 h bulk and book 0.2% yeast', () => {
+    const p = planBatch({ ...base, formula: sameDay });
+    expect(p.stageH).toBe(6);
+    expect(p.yeast.pct).toBeCloseTo(0.002, 9);
+    expect(p.yeast.basis).toBe('book');
+  });
+
+  it('start mode: eat as soon as the overnight dough is ready', () => {
+    const startAt = new Date('2026-11-07T19:35:00');
+    const p = planBatch({ ...base, formula: overnight, timing: 'start', startAt });
+    // 25 min autolyse + 12 h bulk + 6 h fridge proof + 1.5 h warm-up
+    expect((p.input.eatAt.getTime() - startAt.getTime()) / H).toBeCloseTo(25 / 60 + 12 + 6 + 1.5, 9);
+    expect(p.window!.latest.getTime() - p.window!.earliest.getTime()).toBe((48 - 6) * H);
+    expect(p.errors).toEqual([]);
+    expect(p.yeast.pct).toBeCloseTo(0.0008, 9);
+  });
+
+  it('both mode: a long gap becomes fridge time, yeast unchanged', () => {
+    const startAt = new Date('2026-11-06T19:35:00');
+    const p = planBatch({ ...base, formula: overnight, timing: 'both', startAt });
+    expect(p.stageH).toBe(12);
+    expect(p.fitNote).toBeUndefined();
+    expect(p.yeast.pct).toBeCloseTo(0.0008, 9);
+    expect(p.schedule.steps[0].at.getTime()).toBe(startAt.getTime());
+    expect(p.schedule.steps.at(-1)!.at.getTime()).toBe(base.eatAt.getTime());
+    expect(p.errors).toEqual([]);
+  });
+
+  it('both mode: a short gap steps down to the book same-day bulk, never an estimate', () => {
+    const startAt = new Date('2026-11-08T03:35:00'); // 14.4 h: too short for 12 h + 7.5 h
+    const p = planBatch({ ...base, formula: overnight, timing: 'both', startAt });
+    expect(p.stageH).toBe(6);
+    expect(p.yeast.basis).toBe('book');
+    expect(p.yeast.pct).toBeCloseTo(0.002, 9);
+    expect(p.fitNote).toContain('FWSY p.218');
+    expect(p.errors).toEqual([]);
+  });
+
+  it('both mode: too short for any book schedule is an error, with the earliest time', () => {
+    const startAt = new Date('2026-11-08T12:00:00');
+    const p = planBatch({ ...base, formula: overnight, timing: 'both', startAt });
+    expect(p.errors.length).toBeGreaterThan(0);
+    expect(p.window!.earliest.getTime()).toBeGreaterThan(base.eatAt.getTime());
+  });
+
+  it('both mode: beyond the 2-day fridge hold is an error', () => {
+    const p = planBatch({ ...base, formula: overnight, timing: 'both', startAt: new Date('2026-11-04T18:00:00') });
+    expect(p.errors.some((e) => e.startsWith('Too long'))).toBe(true);
+  });
+
+  it('poolish start time is the poolish mix', () => {
+    const startAt = new Date('2026-11-07T20:00:00');
+    const p = planBatch({ ...base, formula: poolish, timing: 'start', startAt });
+    expect(p.schedule.steps[0].key).toBe('poolish');
+    expect(p.schedule.steps[0].at.getTime()).toBe(startAt.getTime());
+  });
+});
+
 describe('advice', () => {
   it('timing comes first', () => {
     expect(topSuggestion({ ready: 'late', stretch: 'tore', bottom: 'pale' })!.area).toBe('timing');

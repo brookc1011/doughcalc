@@ -57,6 +57,8 @@ export interface Formula {
   process: {
     autolyseMin: number;
     foldAfterMin: number;
+    /** The book's bulk (or poolish ripening) time for this dough, hours. Missing: the longest anchor. */
+    stageH?: number;
     /** Poolish doughs only: bulk time of the final dough after the poolish is mixed in. */
     finalBulkH?: number;
     /** Minimum time from balling to baking. */
