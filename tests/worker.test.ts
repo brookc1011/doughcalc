@@ -1,11 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { generateKeyPairSync } from 'node:crypto';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { LIMITS, nextAlarm, parseKey, splitDue, validateIds, validateSchedule } from '../worker/logic';
 
 describe('reading the VAPID private key secret', () => {
-  const jwk = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ format: 'jwk' });
-  const line = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
-  const want = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, d: jwk.d };
+  // Web Crypto (built into Node and browsers) so the app's type check needs no Node typings.
+  let jwk: JsonWebKey = {};
+  let line = '';
+  let want: JsonWebKey = {};
+  beforeAll(async () => {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    line = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
+    want = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, d: jwk.d };
+  });
 
   it('reads the line as printed by npm run vapid', () => expect(parseKey(line)).toEqual(want));
   it('ignores what a messy paste adds around it', () => {
