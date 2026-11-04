@@ -344,11 +344,12 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
       )}
 
       <RecipeView recipe={plan.recipe} yeast={plan.yeast} water={plan.water} unit={unit} />
-      <Timeline
+      {/* A schedule that doesn't fit would show steps out of order (balling after dinner), so hide it until it fits. */}
+      {plan.schedule.errors.length === 0 && <Timeline
         steps={plan.schedule.steps}
         title={formula.name}
         onIcs={() => download('dough-plan.ics', planIcs(plan), 'text/calendar')}
-      />
+      />}
 
       <div className="plan-action"><button className="primary" disabled={plan.errors.length > 0 || saving} onClick={lock}>
         {saving ? 'Saving your batch…' : 'Lock in & start'}
