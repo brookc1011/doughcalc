@@ -28,6 +28,23 @@ async function lockOne() {
   return api.lockIn(plan, 'hand');
 }
 
+describe('checklist', () => {
+  it('check off mix: saved, mirrored to the actual mix time, later steps follow; uncheck restores', async () => {
+    const b = await lockOne();
+    const before = api.batchProgress(b);
+    const ballBefore = before.steps.find((s) => s.key === 'ball')!.at.getTime();
+    const late = new Date('2026-11-06T19:30:00');
+    const checked = await api.checkStep(b.id, 'mix', late);
+    expect(checked.actual.mixAt).toBe(late.toISOString());
+    const after = api.batchProgress((await api.getBatch(b.id))!);
+    expect(after.steps.find((s) => s.key === 'mix')!.doneAt!.getTime()).toBe(late.getTime());
+    expect(after.steps.find((s) => s.key === 'ball')!.at.getTime() - ballBefore).toBe(30 * 60_000);
+    expect(after.steps.find((s) => s.key === 'autolyse')!.passed).toBe(true);
+    const un = await api.uncheckStep(b.id, 'mix');
+    expect(api.batchProgress(un).steps.map((s) => s.at.getTime())).toEqual(before.steps.map((s) => s.at.getTime()));
+  });
+});
+
 describe('api contracts', () => {
   it('first run: defaults to Forkish overnight, 5 x 340 g', async () => {
     const s = await api.getSettings();

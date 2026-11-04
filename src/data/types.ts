@@ -31,6 +31,8 @@ export interface Settings {
   lastBackupAt?: string;
   bakesSinceBackup: number;
   persisted?: boolean;
+  /** Random id naming this phone's reminder slot on the server. Created on first "Remind me". */
+  pushDeviceId?: string;
 }
 
 export interface StepRecord {
@@ -62,6 +64,10 @@ export interface Actual {
   roomF?: number;
   finalDoughF?: number;
   notes?: string;
+  /** Steps checked off on the batch checklist: step key → ISO time. Optional, so no migration. */
+  done?: Record<string, string>;
+  /** Whether phone reminders are on for this batch. */
+  reminders?: boolean;
 }
 
 export interface BakeSession {

@@ -12,6 +12,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      // Step reminders: push and notification-tap handlers (public/push-sw.js).
+      workbox: { importScripts: ['push-sw.js'], navigateFallbackDenylist: [/^\/api\//] },
       manifest: {
         name: 'Dough',
         short_name: 'Dough',

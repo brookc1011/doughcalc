@@ -7,11 +7,13 @@ import { defaultStageH, planBatch, type Plan, type TimingMode } from './engine/p
 import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
 import type { BallGroup, DoughDefaults, Formula, Ingredient } from './engine/types';
+import { replan, type Progress, type ProgressStep } from './engine/progress';
 import { downscalePhoto } from './data/photo';
+import { cancelReminders, pushPermission, pushSupported, scheduleReminders } from './data/push';
 import * as store from './data/store';
 import type { Actual, BakeSession, Batch, Oven, Settings, StepRecord } from './data/types';
 
-export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, ReadyTally, Settings, Suggestion, Survey, TimingMode };
+export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
 export { PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
 
 /** Backup reminder cadence, in bake sessions. */
@@ -203,6 +205,100 @@ export async function updateActual(batchId: string, actual: Actual): Promise<Bat
   const next = { ...b, actual: { ...b.actual, ...actual } };
   await store.saveBatch(next);
   return next;
+}
+
+// ---------- checklist ----------
+/** Where the batch stands: planned steps adjusted for the ones you've checked off. */
+export function batchProgress(b: Batch): Progress {
+  const p = b.planned;
+  const mix = p.steps.find((s) => s.key === 'mix');
+  const done = Object.fromEntries(Object.entries(b.actual.done ?? {}).map(([k, v]) => [k, new Date(v)]));
+  return replan(
+    {
+      formula: p.formula,
+      stageH: p.stageH,
+      warmUpH: p.warmUpH,
+      eatAt: new Date(p.eatAt),
+      plannedMixAt: new Date(mix?.at ?? p.eatAt),
+    },
+    done,
+  );
+}
+
+/** Check a step off (now, or at a time you pick). Mix and ball also fill the "what happened" times. */
+export async function checkStep(batchId: string, key: string, at: Date = new Date()): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const iso = at.toISOString();
+  const actual: Actual = { ...b.actual, done: { ...(b.actual.done ?? {}), [key]: iso } };
+  if (key === 'mix') actual.mixAt = iso;
+  if (key === 'ball') actual.ballAt = iso;
+  const next = { ...b, actual };
+  await store.saveBatch(next);
+  await syncReminders(next);
+  return next;
+}
+
+export async function uncheckStep(batchId: string, key: string): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const done = { ...(b.actual.done ?? {}) };
+  const was = done[key];
+  delete done[key];
+  const actual: Actual = { ...b.actual, done };
+  // Undo the mirrored "what happened" time too, unless it was edited separately since.
+  if (key === 'mix' && actual.mixAt === was) delete actual.mixAt;
+  if (key === 'ball' && actual.ballAt === was) delete actual.ballAt;
+  const next = { ...b, actual };
+  await store.saveBatch(next);
+  await syncReminders(next);
+  return next;
+}
+
+// ---------- reminders ----------
+export { pushSupported, pushPermission };
+
+/** Turn phone reminders on for a batch: asks permission, then sends the remaining step times. */
+export async function remindersOn(batchId: string): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const next = { ...b, actual: { ...b.actual, reminders: true } };
+  await sendReminders(next, await deviceId(), true);
+  await store.saveBatch(next);
+  return next;
+}
+
+export async function remindersOff(batchId: string): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const next = { ...b, actual: { ...b.actual, reminders: false } };
+  await store.saveBatch(next);
+  await cancelReminders(await deviceId(), batchId).catch(() => undefined);
+  return next;
+}
+
+/** Resend remaining steps after a check-off. Failures are swallowed: the checklist still works offline. */
+async function syncReminders(b: Batch): Promise<void> {
+  if (!b.actual.reminders) return;
+  await sendReminders(b, await deviceId(), false).catch(() => undefined);
+}
+
+async function sendReminders(b: Batch, device: string, askPermission: boolean): Promise<void> {
+  const prog = batchProgress(b);
+  const now = Date.now();
+  const items = prog.steps
+    .filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
+    .map((s) => ({ at: s.at.toISOString(), title: s.label, body: `${b.planned.formula.name}: ${s.detail}` }));
+  if (items.length === 0) return cancelReminders(device, b.id);
+  await scheduleReminders({ deviceId: device, batchId: b.id, items, askPermission });
+}
+
+async function deviceId(): Promise<string> {
+  const s = await store.getSettings();
+  if (s.pushDeviceId) return s.pushDeviceId;
+  const id = crypto.randomUUID();
+  await store.saveSettings({ ...s, pushDeviceId: id });
+  return id;
 }
 
 export interface SessionForm {

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PROTECTED = ['src/engine', 'src/data', 'src/api.ts'];
+const PROTECTED = ['src/engine', 'src/data', 'src/api.ts', 'worker', 'wrangler.jsonc', 'public/push-sw.js'];
 const LOCK = 'protected.lock.json';
 
 function files(p) {

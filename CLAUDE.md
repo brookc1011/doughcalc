@@ -7,12 +7,16 @@ Personal pizza dough calculator and bake log for CJ (not LoanStar work). Install
 - `src/data/`: IndexedDB store, schema version and migrations, backup export/import.
 - `src/api.ts`: the only module the UI imports.
 - `src/ui/`: screens and `styles.css`. Restyled by ChatGPT; keep its look unless asked.
-- `tests/`: engine and api tests. `fake-indexeddb` stands in for the browser store.
+- `tests/`: engine, api and worker tests. `fake-indexeddb` stands in for the browser store.
+- `worker/`: step-reminder server (Cloudflare Worker + `Reminders` Durable Object, one slot per phone keyed by a random device id). Holds only the phone's push address and step times. `/api/*` only (`wrangler.jsonc` `run_worker_first`); everything else is static `dist/`. Push encryption: `@pushforge/builder`. Rules in `worker/logic.ts` (tested); type-checked by `tsc -p worker` against `worker/worker-configuration.d.ts` (regenerate with `npm run worker:types` after editing `wrangler.jsonc`).
+- `public/push-sw.js`: push and notification-tap handlers, pulled into the PWA service worker via `workbox.importScripts`.
+- Reminder keys: `npm run vapid` (CJ runs it in his own terminal) writes the public key to `src/data/vapid.ts` and prints the private key once, for the Cloudflare secret `VAPID_PRIVATE_KEY`. Never put the private key in a file, a chat or git. After it runs, `npm run guard:update`. Local testing: `.dev.vars` (git-ignored) with a throwaway key, `npx wrangler dev`.
+- The checklist (`src/engine/progress.ts`) re-times steps from what was checked off: fridge hold absorbs the difference, dinner moves only when the balls can't get their minimum rest.
 
 ## Every change
 1. Make the change.
 2. Run `npm run guard`, `npm test`, `npm run build`. All must pass.
-3. If the change intentionally touches `src/engine`, `src/data` or `src/api.ts`, run `npm run guard:update` after tests pass. A UI-only change must leave the guard passing untouched.
+3. If the change intentionally touches `src/engine`, `src/data`, `src/api.ts`, `worker/`, `wrangler.jsonc` or `public/push-sw.js`, run `npm run guard:update` after tests pass. A UI-only change must leave the guard passing untouched.
 4. Check the app in the browser pane at 375 px (mobile preset), light and dark.
 5. Commit only when CJ says yes. End commit messages with the Co-Authored-By line.
 6. Push with `git push` (remote `origin` = `https://brookc1011@github.com/brookc1011/doughcalc.git`, CJ's personal account; this repo's commit email is cjb1011@gmail.com). The machine's default GitHub login is CJ's work account, which cannot push here.

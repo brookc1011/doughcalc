@@ -18,6 +18,8 @@ export interface ScheduleInput {
   warmUpH: number;
   /** Optional fixed mix time; otherwise the plan works back from eatAt. */
   mixAt?: Date;
+  /** Optional actual balling time (the dough was ready early or late); otherwise mix + bulk. */
+  ballAt?: Date;
 }
 
 export interface Schedule {
@@ -72,7 +74,7 @@ export function buildSchedule(input: ScheduleInput): Schedule {
   const minBallToBakeH = p.minProofH + (fridge ? warmUpH : 0);
 
   const mix = input.mixAt ?? add(eatAt, -(minBallToBakeH + bulkH) * H);
-  const ball = add(mix, bulkH * H);
+  const ball = input.ballAt ?? add(mix, bulkH * H);
   const ballAgeH = (eatAt.getTime() - ball.getTime()) / H;
 
   const errors: string[] = [];

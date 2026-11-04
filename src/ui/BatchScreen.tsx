@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import {
   addSession,
   batchIcs,
+  batchProgress,
+  checkStep,
   deleteBatch,
   exportBackup,
   fmtTemp,
   fmtWhen,
   getBatch,
   photoUrl,
+  pushPermission,
+  remindersOff,
+  remindersOn,
   suggestions,
+  uncheckStep,
   updateActual,
   type Batch,
   type Settings,
@@ -16,7 +22,7 @@ import {
   type Survey,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, NumField, RecipeView, shareOrDownload, Timeline, toLocalInput } from './common';
+import { Chips, cToF, download, fToC, Info, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
 
 export function BatchScreen({
   id,
@@ -71,6 +77,8 @@ export function BatchScreen({
         </section>
       )}
 
+      <Checklist batch={batch} onChange={setBatch} />
+
       {rating ? (
         <RateForm
           settings={settings}
@@ -92,11 +100,6 @@ export function BatchScreen({
       <ActualForm batch={batch} unit={unit} onSave={async (a) => setBatch(await updateActual(batch.id, a))} />
 
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
-      <Timeline
-        steps={p.steps}
-        title={p.formula.name}
-        onIcs={() => download('dough-batch.ics', batchIcs(batch), 'text/calendar')}
-      />
       <p className="muted small">
         Planned for {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}.
       </p>
@@ -113,6 +116,143 @@ export function BatchScreen({
         Delete batch
       </button>
     </div>
+  );
+}
+
+const timeOnly = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** The batch's steps as a checklist. Checking one off re-times the steps after it. */
+function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => void }) {
+  const prog = batchProgress(batch);
+  const [pickFor, setPickFor] = useState<string | null>(null);
+  const [pickAt, setPickAt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const remindOn = !!batch.actual.reminders;
+  const perm = pushPermission();
+  const allDone = !prog.nextKey;
+
+  const check = async (key: string, at?: Date) => {
+    setPickFor(null);
+    onChange(await checkStep(batch.id, key, at));
+  };
+
+  const toggleReminders = async () => {
+    setBusy(true);
+    setMsg('');
+    try {
+      onChange(remindOn ? await remindersOff(batch.id) : await remindersOn(batch.id));
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card checklist">
+      <div className="row between">
+        <h2>Steps</h2>
+        <button className="link small" onClick={() => download('dough-batch.ics', batchIcs(batch), 'text/calendar')}>
+          Add to calendar
+        </button>
+      </div>
+
+      {!allDone && (
+        <div className="remind-row">
+          <button
+            className={remindOn ? 'small remind on' : 'small remind'}
+            aria-pressed={remindOn}
+            disabled={busy || perm === 'unsupported' || perm === 'not-set-up'}
+            onClick={toggleReminders}
+          >
+            {busy ? 'One moment…' : remindOn ? '🔔 Reminders on' : '🔕 Remind me'}
+          </button>
+          <span className="muted small">
+            {perm === 'unsupported'
+              ? 'This browser can’t show reminders. On iPhone, add the app to your home screen first.'
+              : perm === 'not-set-up'
+                ? 'Reminders aren’t set up on the server yet.'
+                : perm === 'denied'
+                  ? 'Notifications are blocked. Allow them in your phone’s settings.'
+                  : remindOn
+                    ? 'Your phone buzzes at each step, even with the app closed.'
+                    : 'A notification at each step, even with the app closed.'}
+            <Info>
+              Your phone gets a private notification address. Only that address and the step times go to the app’s
+              reminder server, never your recipe or bakes. Checking a step off re-sends the new times.
+            </Info>
+          </span>
+          {msg && (
+            <p className="warn" role="alert">
+              {msg}
+            </p>
+          )}
+        </div>
+      )}
+
+      {prog.movedTo && (
+        <p className="warn" role="status">
+          Running behind: the balls need their full rest, so dinner moves to {fmtWhen(prog.movedTo)}.
+        </p>
+      )}
+
+      <ol className="timeline checklist-steps">
+        {prog.steps.map((s) => {
+          const state = s.doneAt ? 'done' : s.passed ? 'passed' : s.key === prog.nextKey ? 'next' : '';
+          return (
+            <li key={s.key} className={state}>
+              <div className="row between">
+                <b>
+                  {s.doneAt ? '✓ ' : ''}
+                  {s.label}
+                </b>
+                {s.doneAt ? (
+                  <button className="link small" onClick={async () => onChange(await uncheckStep(batch.id, s.key))}>
+                    Undo
+                  </button>
+                ) : (
+                  !s.passed && (
+                    <span className="row">
+                      <button
+                        className="link small"
+                        onClick={() => {
+                          setPickFor(pickFor === s.key ? null : s.key);
+                          setPickAt(toLocalInput(new Date()));
+                        }}
+                      >
+                        at…
+                      </button>
+                      <button className={state === 'next' ? 'small primary-small' : 'small'} onClick={() => check(s.key)}>
+                        Done
+                      </button>
+                    </span>
+                  )
+                )}
+              </div>
+              <div className="step-time">
+                {s.doneAt ? `Done ${fmtWhen(s.doneAt)}` : s.passed ? 'Not ticked' : fmtWhen(s.at)}
+              </div>
+              {pickFor === s.key && (
+                <div className="row">
+                  <input
+                    type="datetime-local"
+                    aria-label={`When you did: ${s.label}`}
+                    value={pickAt}
+                    onChange={(e) => setPickAt(e.target.value)}
+                  />
+                  <button className="small" disabled={!pickAt} onClick={() => check(s.key, new Date(pickAt))}>
+                    Save
+                  </button>
+                </div>
+              )}
+              {!s.doneAt && !s.passed && <div className="muted small">{s.detail}</div>}
+            </li>
+          );
+        })}
+      </ol>
+      {allDone && <p className="muted small">All steps done. Dinner was {timeOnly(prog.eatAt)}. Rate it below.</p>}
+    </section>
   );
 }
 

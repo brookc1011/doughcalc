@@ -1,11 +1,17 @@
-// Cloudflare Workers config: serves the built app in dist/ as static files.
-// Cloudflare runs `npm run build`, then `npx wrangler deploy` reads this file.
 {
   "name": "doughcalc",
   "compatibility_date": "2025-09-01",
+  // Reminder server. Only /api/* runs this code; every other path is a static file from dist/.
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./dist",
-    // Single-page app: unknown paths fall back to index.html.
-    "not_found_handling": "single-page-application"
-  }
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // One small slot per phone (push address + step times), with one alarm for the next step.
+  "durable_objects": {
+    "bindings": [{ "name": "REMINDERS", "class_name": "Reminders" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Reminders"] }]
+  // Secret (set in the Cloudflare dashboard, never here): VAPID_PRIVATE_KEY
 }

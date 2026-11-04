@@ -649,3 +649,17 @@ select {
 .info-text { display:block; margin:6px 0 4px; padding:10px 12px; border-radius:10px; background:var(--soft);
   color:var(--ink); font-size:14px; font-weight:400; line-height:1.45; text-transform:none; letter-spacing:normal; }
 .info-text a { display:block; margin-top:6px; color:var(--accent); }
+
+/* Batch checklist */
+.remind-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:12px 0 4px; }
+.remind-row .muted { flex:1 1 180px; }
+.remind-row .warn { flex-basis:100%; margin:0; }
+button.remind.on { background:var(--soft); border-color:var(--accent); color:var(--ink); }
+button.primary-small { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.checklist-steps li.done .step-time, .checklist-steps li.done b { color:var(--muted); }
+.checklist-steps li.done::before { background:var(--olive); border-color:var(--olive); }
+.checklist-steps li.passed { opacity:.55; }
+.checklist-steps li.passed .step-time { font-size:.95rem; }
+.checklist-steps li.next::before { background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 4px var(--soft); }
+.checklist-steps li.next .step-time { color:var(--accent); }
+.checklist-steps input[type=datetime-local] { flex:1 1 auto; min-width:0; }

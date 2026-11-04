@@ -7,6 +7,7 @@ import { waterTemps } from '../src/engine/temperature';
 import { chooseYeast, equivalentHours } from '../src/engine/yeast';
 import { suggestions, topSuggestion } from '../src/engine/advice';
 import { planBatch } from '../src/engine/plan';
+import { replan } from '../src/engine/progress';
 import type { Formula } from '../src/engine/types';
 
 const overnight = getPreset('forkish-overnight')!;
@@ -263,6 +264,60 @@ describe('timing modes', () => {
     const p = planBatch({ ...base, formula: poolish, timing: 'start', startAt });
     expect(p.schedule.steps[0].key).toBe('poolish');
     expect(p.schedule.steps[0].at.getTime()).toBe(startAt.getTime());
+  });
+});
+
+describe('checklist replan (protect dinner)', () => {
+  const t = (s: string) => new Date(s);
+  const at = (p: ReturnType<typeof replan>, key: string) => p.steps.find((s) => s.key === key)!.at.getTime();
+  const eat = t('2026-11-08T18:00:00');
+
+  it('mix 20 min late with fridge slack: fold and ball move, fridge absorbs it, dinner stays', () => {
+    const input = { formula: overnight, stageH: 12, warmUpH: 1.5, eatAt: eat, plannedMixAt: t('2026-11-07T20:00:00') };
+    const p = replan(input, { mix: t('2026-11-07T20:20:00') });
+    expect(at(p, 'fold')).toBe(t('2026-11-07T21:05:00').getTime());
+    expect(at(p, 'ball')).toBe(t('2026-11-08T08:20:00').getTime());
+    expect(at(p, 'pull')).toBe(t('2026-11-08T16:30:00').getTime());
+    expect(p.eatAt.getTime()).toBe(eat.getTime());
+    expect(p.movedTo).toBeUndefined();
+    expect(p.nextKey).toBe('fold');
+  });
+
+  it('mix 20 min late with no slack (book minimum fridge proof): dinner moves 20 min', () => {
+    const input = { formula: overnight, stageH: 12, warmUpH: 1.5, eatAt: eat, plannedMixAt: t('2026-11-07T22:30:00') };
+    const p = replan(input, { mix: t('2026-11-07T22:50:00') });
+    expect(p.movedTo!.getTime()).toBe(t('2026-11-08T18:20:00').getTime());
+  });
+
+  it('same-day balled 2 h late: dinner moves to ball + 1.5 h', () => {
+    const input = { formula: sameDay, stageH: 6, warmUpH: 1.5, eatAt: eat, plannedMixAt: t('2026-11-08T10:30:00') };
+    const p = replan(input, { mix: t('2026-11-08T10:30:00'), ball: t('2026-11-08T18:30:00') });
+    expect(p.movedTo!.getTime()).toBe(t('2026-11-08T20:00:00').getTime());
+    expect(at(p, 'bake')).toBe(t('2026-11-08T20:00:00').getTime());
+    expect(p.errors).toEqual([]);
+  });
+
+  it('same-day balled early with time to spare: a fridge step appears', () => {
+    const input = { formula: sameDay, stageH: 6, warmUpH: 1.5, eatAt: eat, plannedMixAt: t('2026-11-08T10:30:00') };
+    expect(replan(input, {}).steps.some((s) => s.key === 'fridge')).toBe(false);
+    const p = replan(input, { ball: t('2026-11-08T14:00:00') });
+    expect(p.steps.some((s) => s.key === 'fridge')).toBe(true);
+    expect(p.eatAt.getTime()).toBe(eat.getTime());
+  });
+
+  it('poolish mixed 1 h late: final mix moves 1 h', () => {
+    const input = { formula: poolish, stageH: 13, warmUpH: 1.5, eatAt: eat, plannedMixAt: t('2026-11-08T10:30:00') };
+    const p = replan(input, { poolish: t('2026-11-07T22:30:00') });
+    expect(at(p, 'mix')).toBe(t('2026-11-08T11:30:00').getTime());
+    expect(at(p, 'poolish')).toBe(t('2026-11-07T22:30:00').getTime());
+    expect(p.steps.find((s) => s.key === 'poolish')!.doneAt).toBeDefined();
+  });
+
+  it('nothing checked off reproduces the locked plan', () => {
+    const plan = buildSchedule({ formula: overnight, eatAt: eat, stageH: 12, warmUpH: 1.5 });
+    const mix = plan.steps.find((s) => s.key === 'mix')!.at;
+    const p = replan({ formula: overnight, stageH: 12, warmUpH: 1.5, eatAt: eat, plannedMixAt: mix }, {});
+    expect(p.steps.map((s) => [s.key, s.at.getTime()])).toEqual(plan.steps.map((s) => [s.key, s.at.getTime()]));
   });
 });
 

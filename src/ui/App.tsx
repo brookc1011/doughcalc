@@ -23,8 +23,11 @@ export function App() {
   const stack = useRef<Route[]>([{ name: 'plan' }]);
   const idx = useRef(0);
 
+  // Read before the history reset below drops it from the address.
+  const openBatch = useRef(new URLSearchParams(location.search).get('batch'));
+
   useEffect(() => {
-    history.replaceState({ idx: 0 }, '');
+    history.replaceState({ idx: 0 }, '', location.pathname);
     const onPop = (e: PopStateEvent) => {
       const i = typeof e.state?.idx === 'number' ? e.state.idx : 0;
       idx.current = i;
@@ -46,6 +49,16 @@ export function App() {
     history.pushState({ idx: idx.current }, '');
     setRoute(r);
   };
+
+  // A tapped reminder opens its batch: ?batch=<id> on a cold start, or a message from the service worker.
+  useEffect(() => {
+    if (openBatch.current) go({ name: 'batch', id: openBatch.current });
+    const onMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'open-batch' && typeof e.data.batchId === 'string') go({ name: 'batch', id: e.data.batchId });
+    };
+    navigator.serviceWorker?.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
+  }, []);
 
   useEffect(() => { window.scrollTo(0, 0); }, [route.name]);
 

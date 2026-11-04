@@ -8,7 +8,7 @@ You are restyling the UI of a small personal pizza-dough app. The math and stora
 - You may add new files under `src/ui/` (components, CSS, fonts via Google Fonts).
 
 ## What you must not change
-- `src/engine/`, `src/data/`, `src/api.ts`. A check (`npm run guard`) fails the build if any of these change.
+- `src/engine/`, `src/data/`, `src/api.ts`, `worker/`, `wrangler.jsonc`, `public/push-sw.js`. A check (`npm run guard`) fails the build if any of these change.
 - UI code imports only from `../api` (and its own `src/ui` files). Never import `src/engine` or `src/data` directly.
 
 ## Files in the zip
@@ -25,10 +25,12 @@ You are restyling the UI of a small personal pizza-dough app. The math and stora
 - Return complete files, not snippets.
 
 ## Screens (keep the flow, restyle freely)
-1. **Plan** (`PlanScreen.tsx`): dough picker, ball groups (count x grams, label), eat-at time, room temperature. A "Details" drawer holds mixer, ferment hours, fixed mix time, yeast override, hydration and salt, "Save as My Dough", and a style-thickness reference. Below: recipe, water temperature, timeline, and the big "Lock in & start" button.
-2. **Batch** (`BatchScreen.tsx`): after lock-in. "Rate a bake" form (chips), list of bakes from the batch, "what actually happened" form, the frozen recipe and timeline, calendar export.
+1. **Plan** (`PlanScreen.tsx`): dough picker, dough balls (count x grams, extra lines for a second size), "Plan around" (Eat at / Start at / Both) with the matching time inputs and the ready-window note, room temperature. A "Details" drawer holds mixer, ferment hours, yeast override, hydration and salt, "Save as My Dough". Below: recipe, water temperature, timeline, and the big "Lock in & start" button. In Both mode, a card lists other doughs that fit.
+2. **Batch** (`BatchScreen.tsx`): after lock-in. The **Steps checklist** (Done / "at…" / Undo per step, next step highlighted, "Running behind" note when dinner moves, "Remind me" toggle with its status line, calendar export), "Rate a bake" form (chips), list of bakes, "what actually happened" form, the frozen recipe.
 3. **Bakes** (`HistoryScreen.tsx`): "Try next time" card, per-dough averages with a trend line, timing tally, all batches.
 4. **Settings** (`SettingsScreen.tsx`): units, warm-up hours, kitchen yeast multiplier, water-temperature band and friction, ovens, backup and restore.
+
+The small "i" buttons (`Info` in `common.tsx`) hold short explanations; keep their text and links.
 
 ## Design goals
 - Phone first (375 px wide). Large tap targets. The Plan screen should feel like 4 inputs and a result.
