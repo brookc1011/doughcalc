@@ -3,20 +3,12 @@
 // (wrangler.jsonc: assets.run_worker_first). Holds a phone's push address and step times, nothing else.
 import { DurableObject } from 'cloudflare:workers';
 import { buildPushHTTPRequest } from '@pushforge/builder';
-import { LIMITS, nextAlarm, splitDue, validateIds, validateSchedule, type Item, type Subscription } from './logic';
+import { LIMITS, nextAlarm, parseKey, splitDue, validateIds, validateSchedule, type Item, type Subscription } from './logic';
 
 interface Env {
   REMINDERS: DurableObjectNamespace<Reminders>;
   /** Private VAPID key as JWK JSON. Cloudflare secret, set by CJ; never in git. */
   VAPID_PRIVATE_KEY?: string;
-}
-
-/** The secret is the JWK as JSON. Tolerates it pasted with extra quotes around it. */
-function parseKey(raw: string): JsonWebKey {
-  let v: unknown = raw.trim();
-  for (let i = 0; i < 2 && typeof v === 'string'; i++) v = JSON.parse(v);
-  if (!v || typeof v !== 'object' || !('d' in v)) throw new Error('VAPID_PRIVATE_KEY is not a private JWK.');
-  return v as JsonWebKey;
 }
 
 const json = (status: number, body: unknown) =>

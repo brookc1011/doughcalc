@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { LIMITS, nextAlarm, splitDue, validateIds, validateSchedule } from '../worker/logic';
+import { generateKeyPairSync } from 'node:crypto';
+import { LIMITS, nextAlarm, parseKey, splitDue, validateIds, validateSchedule } from '../worker/logic';
+
+describe('reading the VAPID private key secret', () => {
+  const jwk = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ format: 'jwk' });
+  const line = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
+  const want = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, d: jwk.d };
+
+  it('reads the line as printed by npm run vapid', () => expect(parseKey(line)).toEqual(want));
+  it('ignores what a messy paste adds around it', () => {
+    expect(parseKey(`${line}${line}`)).toEqual(want); // pasted twice
+    expect(parseKey(`${line}\r\nThen close this window.`)).toEqual(want); // next output line came along
+    expect(parseKey(`  ${line}  `)).toEqual(want);
+    expect(parseKey(JSON.stringify(line))).toEqual(want); // wrapped in quotes
+  });
+  it('refuses something that is not a private P-256 key, without echoing it', () => {
+    expect(() => parseKey('nothing here')).toThrow(/does not contain/);
+    const pub = JSON.stringify({ kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y });
+    expect(() => parseKey(pub)).toThrow(/not a private P-256 key/);
+    try {
+      parseKey(pub);
+    } catch (e) {
+      expect(String(e)).not.toContain(jwk.x as string);
+    }
+  });
+});
 
 const now = Date.parse('2026-11-04T12:00:00Z');
 const good = () => ({

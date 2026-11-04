@@ -95,6 +95,35 @@ export function validateSchedule(body: unknown, now: number): Result<ScheduleBod
   };
 }
 
+/**
+ * The VAPID private key secret is a JWK as JSON. Pasting it into a terminal prompt or the dashboard can add
+ * things around it (quotes, a second copy, the next line of output), so take the first {...} object in it
+ * and check it really is a private EC key. Never echoes the value in errors.
+ */
+export function parseKey(raw: string): JsonWebKey {
+  const text = raw.trim();
+  let candidate = text;
+  try {
+    const once = JSON.parse(text);
+    if (typeof once === 'string') candidate = once; // pasted with extra quotes around it
+  } catch {
+    // not plain JSON: fall through to pulling out the first object
+  }
+  const obj = /\{[^{}]*\}/.exec(candidate)?.[0];
+  if (!obj) throw new Error('VAPID_PRIVATE_KEY does not contain a JSON key.');
+  let key: unknown;
+  try {
+    key = JSON.parse(obj);
+  } catch {
+    throw new Error('VAPID_PRIVATE_KEY could not be read as JSON.');
+  }
+  const k = key as Record<string, unknown>;
+  if (k.kty !== 'EC' || k.crv !== 'P-256' || typeof k.d !== 'string' || typeof k.x !== 'string' || typeof k.y !== 'string') {
+    throw new Error('VAPID_PRIVATE_KEY is not a private P-256 key.');
+  }
+  return { kty: 'EC', crv: 'P-256', x: k.x, y: k.y, d: k.d };
+}
+
 /** Split one batch's items into those to send now and those to keep. */
 export function splitDue(items: Item[], now: number): { due: Item[]; later: Item[] } {
   const cut = now + LIMITS.dueWindowMs;
