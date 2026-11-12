@@ -1,4 +1,5 @@
-import { computeRecipe, type Recipe } from './formula';
+import { computeRecipe, type Recipe, type YeastType } from './formula';
+import type { MixMethod } from './methods';
 import { getPreset } from './presets';
 import { buildSchedule, eatWindow, type Schedule } from './schedule';
 import { waterTemps, type TempSettings, type WaterTemp } from './temperature';
@@ -30,6 +31,11 @@ export interface PlanInput {
   kitchenFactor?: number;
   residuePct?: number;
   temp: TempSettings;
+  /** Sets the mix and fold instructions. */
+  mixer?: MixMethod;
+  /** Oven preheat before the first pizza, minutes. Adds a preheat step. */
+  preheatMin?: number;
+  yeastType?: YeastType;
 }
 
 export interface Plan {
@@ -88,9 +94,24 @@ export function planBatch(raw: PlanInput): Plan {
     { hours: stageH, tempF: input.roomF },
     { kitchenFactor: input.kitchenFactor, manualPct: input.manualYeastPct },
   );
-  const recipe = computeRecipe({ formula: f, yeastPct: yeast.pct, balls: input.balls, residuePct: input.residuePct });
+  // A typed override is taken as the yeast you're using, so it isn't converted again.
+  const recipe = computeRecipe({
+    formula: f,
+    yeastPct: yeast.pct,
+    balls: input.balls,
+    residuePct: input.residuePct,
+    yeastType: yeast.basis === 'manual' ? 'instant' : input.yeastType,
+  });
   const water = waterTemps(f, input.roomF, input.temp);
-  const schedule = buildSchedule({ formula: f, eatAt: input.eatAt, stageH, warmUpH: input.warmUpH, mixAt: input.mixAt });
+  const schedule = buildSchedule({
+    formula: f,
+    eatAt: input.eatAt,
+    stageH,
+    warmUpH: input.warmUpH,
+    mixAt: input.mixAt,
+    mixer: input.mixer,
+    preheatMin: input.preheatMin,
+  });
 
   const errors = [...recipe.errors, ...schedule.errors];
   if (input.balls.every((b) => b.count <= 0)) errors.push('Add at least one dough ball.');

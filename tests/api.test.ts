@@ -172,3 +172,51 @@ describe('api contracts', () => {
     expect(ics.match(/BEGIN:VEVENT/g)!.length).toBe(b.planned.steps.length);
   });
 });
+
+describe('bake help: method, preheat, yeast, flour', () => {
+  async function plan(mixer: 'hand' | 'mixer', yeastType?: 'instant' | 'activeDry') {
+    const s = await api.getSettings();
+    const formula = await api.findDough(s.lastDoughId);
+    return api.makePlan(
+      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer, mixAt: new Date('2026-11-06T19:00:00'), yeastType },
+      s,
+    );
+  }
+
+  it('new batches carry a preheat step and the chosen method through the checklist', async () => {
+    const b = await api.lockIn(await plan('mixer'), 'mixer', 'ap');
+    expect(b.planned.stepVersion).toBe(2);
+    expect(b.planned.flour).toBe('ap');
+    const steps = api.batchProgress(b).steps;
+    expect(steps.some((s) => s.key === 'preheat')).toBe(true);
+    expect(steps.find((s) => s.key === 'mix')!.detail).toContain('speed 2');
+    expect((await api.getSettings()).flour).toBe('ap');
+  });
+
+  it('a batch locked before this change keeps hand text and gets no preheat step', async () => {
+    const b = await api.lockIn(await plan('mixer'), 'mixer');
+    const old = { ...b, planned: { ...b.planned, stepVersion: undefined, preheatMin: undefined } };
+    const steps = api.batchProgress(old).steps;
+    expect(steps.some((s) => s.key === 'preheat')).toBe(false);
+    expect(steps.find((s) => s.key === 'mix')!.detail).toContain('pincer');
+  });
+
+  it('active dry from the form is stored on the batch', async () => {
+    const b = await api.lockIn(await plan('hand', 'activeDry'), 'hand');
+    expect(b.planned.yeastType).toBe('activeDry');
+  });
+
+  it('flour history averages overall scores per flour', async () => {
+    const a = await api.lockIn(await plan('hand'), 'hand', '00');
+    await api.addSession(a.id, { ovenId: 'home-oven', balls: 2, survey: { overall: 3 } });
+    await api.addSession(a.id, { ovenId: 'home-oven', balls: 2, survey: { overall: 5 } });
+    const c = await api.lockIn(await plan('hand'), 'hand', 'ap');
+    await api.addSession(c.id, { ovenId: 'home-oven', balls: 2, survey: {} });
+    await api.lockIn(await plan('hand'), 'hand');
+    const h = await api.flourHistory();
+    const z = h.find((r) => r.flour === '00')!;
+    expect(z).toMatchObject({ bakes: 2, rated: 2, avgOverall: 4, label: '00' });
+    expect(h.find((r) => r.flour === 'ap')).toMatchObject({ bakes: 1, rated: 0, avgOverall: undefined });
+    expect(h.length).toBe(2);
+  });
+});

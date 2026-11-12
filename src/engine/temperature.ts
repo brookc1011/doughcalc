@@ -11,6 +11,8 @@ export interface TempSettings {
   bandHighF: number;
   /** Temperature rise from mixing, °F. Hand folds: King Arthur 0-4°F. Stand mixer: King Arthur 22-24°F. */
   frictionF: number;
+  /** Stand mixer: the book's temperatures are for Forkish's hand mix, so always calculate. */
+  machineMixed?: boolean;
 }
 
 export interface WaterTemp {
@@ -23,7 +25,7 @@ export interface WaterTemp {
 }
 
 export function waterTemps(formula: Formula, roomF: number, s: TempSettings): WaterTemp[] {
-  const inBand = roomF >= s.bandLowF && roomF <= s.bandHighF;
+  const inBand = !s.machineMixed && roomF >= s.bandLowF && roomF <= s.bandHighF;
   const ddt = (formula.ddtF[0] + formula.ddtF[1]) / 2;
 
   return formula.waterF.map((w, i) => {
@@ -41,7 +43,9 @@ export function waterTemps(formula: Formula, roomF: number, s: TempSettings): Wa
       lowF: t,
       highF: t,
       basis: 'calculated',
-      note: `Room is outside ${s.bandLowF}-${s.bandHighF}°F, so water is set to land the dough at ${ddt}°F (King Arthur DDT formula, friction ${s.frictionF}°F).`,
+      note: s.machineMixed
+        ? `Stand mixer: the book's temperatures are for mixing by hand, so water is set to land the dough at ${ddt}°F (King Arthur DDT formula, friction ${s.frictionF}°F).`
+        : `Room is outside ${s.bandLowF}-${s.bandHighF}°F, so water is set to land the dough at ${ddt}°F (King Arthur DDT formula, friction ${s.frictionF}°F).`,
     };
     if (t > 115) out.warning = 'Very hot water. Above about 115°F, use the book temperature and expect a slower ferment instead.';
     if (t < 35) out.warning = 'Ice-cold water needed. Consider a cooler spot for the bulk instead.';

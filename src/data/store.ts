@@ -31,6 +31,10 @@ export const DEFAULT_SETTINGS: Settings = {
   hiddenDoughIds: [],
   bakesSinceBackup: 0,
   reminderLeadMin: 0,
+  // King Arthur: preheat a stone or steel "at least an hour" (How to make pizza crust crispy, 2024).
+  // Baking Steel says 45-60 minutes. Editable in Settings.
+  preheatMin: 60,
+  yeastType: 'instant',
 };
 
 let dbPromise: Promise<IDBPDatabase<DoughDB>> | null = null;

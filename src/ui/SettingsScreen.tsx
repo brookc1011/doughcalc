@@ -44,6 +44,13 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           </span>
           <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
         </label>
+        <label>
+          <span>
+            Oven preheat (minutes)
+            <Info label="preheat time">{HELP_COPY["preheat time"]}</Info>
+          </span>
+          <NumField value={s.preheatMin ?? 60} onValue={(n) => save({ ...s, preheatMin: n })} />
+        </label>
       </section>
 
       <section className="card">

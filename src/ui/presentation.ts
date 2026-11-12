@@ -39,8 +39,8 @@ export function stepTimeText(
 }
 
 export const TIMING_HINTS: Record<TimingMode, string> = {
-  eat: 'Dinner time is fixed. Work back to the first step.',
-  start: 'Start time is fixed. See when you can eat.',
+  eat: 'Bake time is fixed. Work back to the first step.',
+  start: 'Start time is fixed. See when you can bake.',
   both: 'Set both times. See whether this dough fits.',
 };
 

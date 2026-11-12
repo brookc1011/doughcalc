@@ -2,6 +2,7 @@ import { infoLabel } from './presentation';
 export { jumpTo } from './presentation';
 import React, { useEffect, useId, useState, type InputHTMLAttributes } from 'react';
 import {
+  ACTIVE_DRY_SOURCE,
   fmtGrams,
   fmtPct,
   fmtTempRange,
@@ -81,6 +82,7 @@ export function RecipeView({ recipe, yeast, water, unit }: { recipe: Recipe; yea
       <p className="muted small">
         Makes {fmtGrams(recipe.grossDoughG)} of dough. Yeast: {yeast.basis === 'estimate' ? 'estimate. ' : ''}
         {yeast.note}
+        {recipe.totals.some((i) => i.name === 'Active dry yeast') ? ` Active dry: ${ACTIVE_DRY_SOURCE}.` : ''}
       </p>
       {yeast.warning && <p className="warn">{yeast.warning}</p>}
       <h3 className="water-heading">Water temperature</h3>

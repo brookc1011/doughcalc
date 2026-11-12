@@ -1,4 +1,5 @@
 import { buildSchedule, type Step } from './schedule';
+import type { MixMethod } from './methods';
 import type { Formula } from './types';
 
 // Re-plans a locked batch from the steps you've checked off.
@@ -14,6 +15,9 @@ export interface ProgressInput {
   eatAt: Date;
   /** Planned mix time (from the locked plan). */
   plannedMixAt: Date;
+  mixer?: MixMethod;
+  /** Preheat minutes stored with the batch; older batches have none and get no preheat step. */
+  preheatMin?: number;
 }
 
 export interface ProgressStep extends Step {
@@ -47,7 +51,7 @@ export function replan(input: ProgressInput, done: Record<string, Date>): Progre
   else if (done.autolyse) mixAt = new Date(done.autolyse.getTime() + p.autolyseMin * M);
   else if (done.poolish) mixAt = new Date(done.poolish.getTime() + stageH * H);
 
-  const base = { formula: f, stageH, warmUpH, mixAt, ballAt: done.ball };
+  const base = { formula: f, stageH, warmUpH, mixAt, ballAt: done.ball, mixer: input.mixer, preheatMin: input.preheatMin };
   let eatAt = input.eatAt;
   let sch = buildSchedule({ ...base, eatAt });
   let movedTo: Date | undefined;

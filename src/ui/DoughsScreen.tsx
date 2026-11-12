@@ -232,7 +232,7 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
           + another size
         </button>
         <label>
-          Eat at (time of day)
+          Bake at (time of day)
           <select value={eatHour} onChange={(e) => { setEatHour(Number(e.target.value)); setSaved(false); }}>
             {Array.from({ length: 24 }, (_, h) => (
               <option key={h} value={h}>

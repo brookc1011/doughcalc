@@ -1,6 +1,7 @@
+import { mixSteps, preheatDetail, type MixMethod } from './methods';
 import type { Formula } from './types';
 
-export type StepKey = 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'bake';
+export type StepKey = 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'preheat' | 'bake';
 
 export interface Step {
   key: StepKey;
@@ -20,6 +21,10 @@ export interface ScheduleInput {
   mixAt?: Date;
   /** Optional actual balling time (the dough was ready early or late); otherwise mix + bulk. */
   ballAt?: Date;
+  /** How the dough is mixed; sets the mix and fold instructions. Defaults to by hand. */
+  mixer?: MixMethod;
+  /** Minutes of oven preheat before the first pizza goes in. Omitted: no preheat step (older batches). */
+  preheatMin?: number;
 }
 
 export interface Schedule {
@@ -101,17 +106,19 @@ export function buildSchedule(input: ScheduleInput): Schedule {
       detail: 'Hydrate the yeast in a little of the water. Mix flour with the rest of the water; cover and rest.',
     });
   }
+  const how = mixSteps(input.mixer ?? 'hand', isPoolish);
+  const ddt = `${f.ddtF[0]}${f.ddtF[1] !== f.ddtF[0] ? `-${f.ddtF[1]}` : ''}°F`;
   steps.push({
     key: 'mix',
     label: isPoolish ? 'Mix the final dough' : 'Mix in salt and yeast',
     at: mix,
-    detail: `Pincer and fold until fully combined. Target dough temp ${f.ddtF[0]}${f.ddtF[1] !== f.ddtF[0] ? `-${f.ddtF[1]}` : ''}°F.`,
+    detail: `${how.mix} Target dough temp ${ddt}.`,
   });
   steps.push({
     key: 'fold',
     label: 'Fold',
     at: add(mix, p.foldAfterMin * M),
-    detail: 'One or two folds, then oil the dough and tub lightly.',
+    detail: how.fold,
   });
   steps.push({ key: 'ball', label: 'Divide and ball', at: ball, detail: 'Medium-tight rounds; do not degas.' });
   // Room-proofed doughs baked much later than their minimum go in the fridge after a short rest
@@ -131,7 +138,15 @@ export function buildSchedule(input: ScheduleInput): Schedule {
       detail: 'Leave covered at room temperature until they stretch easily.',
     });
   }
-  steps.push({ key: 'bake', label: 'Bake', at: eatAt, detail: 'Stretch, top and bake.' });
+  if (input.preheatMin && input.preheatMin > 0) {
+    steps.push({
+      key: 'preheat',
+      label: 'Preheat the oven',
+      at: add(eatAt, -input.preheatMin * M),
+      detail: preheatDetail(input.preheatMin),
+    });
+  }
+  steps.push({ key: 'bake', label: 'Bake', at: eatAt, detail: 'First pizza in. Stretch, top and bake.' });
 
   steps.sort((a, b) => a.at.getTime() - b.at.getTime());
   return { steps, errors, ballAgeH };

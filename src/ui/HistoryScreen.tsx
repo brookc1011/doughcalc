@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
-import { doughHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
+import { doughHistory, flourHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
 import type { Route } from './App';
 import { KitchenMark } from './common';
 
 type History = Awaited<ReturnType<typeof doughHistory>>;
+type FlourRows = Awaited<ReturnType<typeof flourHistory>>;
 
 export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Route) => void }) {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [hist, setHist] = useState<History>([]);
   const [tally, setTally] = useState<ReadyTally | null>(null);
+  const [flours, setFlours] = useState<FlourRows>([]);
 
   useEffect(() => {
     listBatches().then(setBatches);
     doughHistory().then(setHist);
     timingTally().then(setTally);
+    flourHistory().then(setFlours);
   }, []);
 
   const latestTry = batches.find((b) => b.nextTry)?.nextTry;
@@ -46,6 +49,23 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
                   Open best batch
                 </button>
               )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {flours.length >= 2 && (
+        <section className="card">
+          <h2>By flour</h2>
+          {flours.map((f) => (
+            <div key={f.flour} className="session">
+              <div className="row between">
+                <b>{f.label}</b>
+                <span className="score">{f.avgOverall ? `${f.avgOverall.toFixed(1)}/5 avg` : ''}</span>
+              </div>
+              <div className="muted small">
+                {f.bakes} {f.bakes === 1 ? 'bake' : 'bakes'}{f.rated < f.bakes ? `, ${f.rated} rated` : ''}
+              </div>
             </div>
           ))}
         </section>

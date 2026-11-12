@@ -8,6 +8,7 @@ import {
   checkStep,
   deleteBatch,
   exportBackup,
+  FLOUR_LABELS,
   fmtTemp,
   fmtWhen,
   getBatch,
@@ -93,7 +94,7 @@ export function BatchScreen({
 <section id={BATCH_TARGETS.recipe} tabIndex={-1} aria-label="Batch recipe">
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
       <p className="muted small">
-        Planned for {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}.
+        Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${FLOUR_LABELS[p.flour]} flour` : ''}.
       </p>
 </section>
 
@@ -215,7 +216,7 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
 
       {prog.movedTo && (
         <p className="warn" role="status">
-          Running behind: the balls need their full rest, so dinner moves to {fmtWhen(prog.movedTo)}.
+          Running behind: the balls need their full rest, so the bake moves to {fmtWhen(prog.movedTo)}.
         </p>
       )}
 

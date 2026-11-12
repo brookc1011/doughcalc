@@ -1,11 +1,12 @@
 import { defaultStart, READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation';
-import { HELP_COPY } from './helpCopy';
+import { FLOUR_SOURCES, HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
   allDoughs,
   ballForDiameter,
   cloneDough,
   DEFAULT_EAT_HOUR,
+  FLOUR_LABELS,
   defaultBalls,
   defaultStageH,
   fmtWhen,
@@ -15,9 +16,11 @@ import {
   planIcs,
   saveDough,
   type BallGroup,
+  type Flour,
   type Formula,
   type Settings,
   type TimingMode,
+  type YeastType,
 } from '../api';
 import type { Route } from './App';
 import { Chips, cToF, download, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
@@ -31,15 +34,15 @@ function tomorrowAt(hour: number): Date {
 
 
 const TIMING_OPTIONS: { v: TimingMode; label: string }[] = [
-  { v: 'eat', label: 'Eat at' },
+  { v: 'eat', label: 'Bake at' },
   { v: 'start', label: 'Start at' },
   { v: 'both', label: 'Both' },
 ];
 
 const TIMING_INTRO: Record<TimingMode, string> = {
-  eat: 'Pick your dough. We’ll work back from dinner.',
+  eat: 'Pick your dough. We’ll work back from when the first pizza goes in.',
   start: 'Pick your dough. We’ll tell you when it’s ready.',
-  both: 'Pick your dough. We’ll fit it between start and dinner.',
+  both: 'Pick your dough. We’ll fit it between start and bake.',
 };
 
 export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
@@ -52,6 +55,8 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const [startAt, setStartAt] = useState(toLocalInput(defaultStart()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
   const [mixer, setMixer] = useState<'hand' | 'mixer'>(settings.mixer);
+  const [yeastType, setYeastType] = useState<YeastType>(settings.yeastType ?? 'instant');
+  const [flour, setFlour] = useState<Flour | ''>(settings.flour ?? '');
   const [details, setDetails] = useState(false);
   const [stageH, setStageH] = useState<number | undefined>();
   const [manualYeast, setManualYeast] = useState('');
@@ -96,13 +101,14 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         timing,
         startAt: timing === 'eat' ? undefined : new Date(startAt),
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
+        yeastType,
       },
       settings,
     );
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, settings, unit],
+    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, yeastType, settings, unit],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.
@@ -146,7 +152,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
   const lock = async () => {
     setSaving(true);
     try {
-      const batch = await lockIn(plan, mixer);
+      const batch = await lockIn(plan, mixer, flour || undefined);
       onSaved();
       go({ name: 'batch', id: batch.id });
     } catch (e) {
@@ -231,7 +237,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         )}
         {timing !== 'start' && (
           <label>
-            Eat at
+            Bake at <span className="field-hint">first pizza in</span>
             <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
           </label>
         )}
@@ -257,6 +263,38 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </span>
           <NumField value={room} onValue={setRoom} />
         </label>
+        <label>
+          <span>
+            Mixing
+            <Info label="mixing method">{HELP_COPY["mixing method"]}</Info>
+          </span>
+          <select value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
+            <option value="hand">By hand</option>
+            <option value="mixer">Stand mixer</option>
+          </select>
+        </label>
+        <label>
+            <span>
+              Yeast
+              <Info label="yeast type">{HELP_COPY["yeast type"]}</Info>
+            </span>
+            <select value={yeastType} onChange={(e) => setYeastType(e.target.value as YeastType)}>
+              <option value="instant">Instant</option>
+              <option value="activeDry">Active dry</option>
+            </select>
+        </label>
+        <label>
+            <span>
+              Flour
+              <Info label="flour" links={FLOUR_SOURCES}>{HELP_COPY["flour"]}</Info>
+            </span>
+            <select value={flour} onChange={(e) => setFlour(e.target.value as Flour | '')}>
+              <option value="">Not set</option>
+              {(Object.keys(FLOUR_LABELS) as Flour[]).map((k) => (
+                <option key={k} value={k}>{FLOUR_LABELS[k]}</option>
+              ))}
+            </select>
+        </label>
       </section>
 
       {plan.errors.map((e) => (
@@ -267,7 +305,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
       {fitting.length > 0 && (
         <section className="card fitting-card">
           <h2>A dough that fits</h2>
-          <p className="small">These doughs fit your start and eat times on the book schedule:</p>
+          <p className="small">These doughs fit your start and bake times on the book schedule:</p>
           {fitting.map((d) => (
             <div className="fit-option" key={d.id}>
               <span>{d.name}</span>
@@ -285,13 +323,6 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
       {details && (
         <section className="card">
           <h2>Fine-tune this bake</h2>
-          <label>
-            Mixing
-            <select value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
-              <option value="hand">By hand</option>
-              <option value="mixer">Stand mixer</option>
-            </select>
-          </label>
           <label>
             <span>
               {stageLabel}

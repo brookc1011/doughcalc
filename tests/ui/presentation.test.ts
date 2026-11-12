@@ -48,8 +48,8 @@ describe('checklist presentation preserves engine state precedence', () => {
 
 describe('planning mode hints', () => {
   it.each([
-    ['eat', 'Dinner time is fixed. Work back to the first step.'],
-    ['start', 'Start time is fixed. See when you can eat.'],
+    ['eat', 'Bake time is fixed. Work back to the first step.'],
+    ['start', 'Start time is fixed. See when you can bake.'],
     ['both', 'Set both times. See whether this dough fits.'],
   ] as const)('%s describes the constraint without promising a fit', (mode, expected) => {
     expect(TIMING_HINTS[mode]).toBe(expected);

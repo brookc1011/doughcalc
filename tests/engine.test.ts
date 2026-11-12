@@ -332,3 +332,67 @@ describe('advice', () => {
     expect(suggestions({ ready: 'onTime', stretch: 'good', rim: 'good', bottom: 'good', center: 'set' })).toEqual([]);
   });
 });
+
+describe('mix method, preheat and yeast type', () => {
+  const eatAt = new Date('2026-11-07T18:00:00');
+  const base = { formula: overnight, eatAt, stageH: 12, warmUpH: 1.5 };
+  const detail = (s: ReturnType<typeof buildSchedule>, k: string) => s.steps.find((x) => x.key === k)?.detail ?? '';
+
+  it('hand and mixer give different mix instructions, same fold', () => {
+    const hand = buildSchedule({ ...base, mixer: 'hand' });
+    const mixer = buildSchedule({ ...base, mixer: 'mixer' });
+    expect(detail(hand, 'mix')).toContain('pincer');
+    expect(detail(mixer, 'mix')).toContain('speed 2');
+    expect(detail(hand, 'mix')).not.toBe(detail(mixer, 'mix'));
+    expect(detail(hand, 'fold')).toBe(detail(mixer, 'fold'));
+  });
+
+  it('preheat step sits preheatMin before the bake; none without it', () => {
+    const sch = buildSchedule({ ...base, preheatMin: 60 });
+    const pre = sch.steps.find((s) => s.key === 'preheat')!;
+    const bake = sch.steps.find((s) => s.key === 'bake')!;
+    expect((bake.at.getTime() - pre.at.getTime()) / 60_000).toBe(60);
+    expect(buildSchedule(base).steps.some((s) => s.key === 'preheat')).toBe(false);
+  });
+
+  it('preheat moves with the bake when the checklist re-times', () => {
+    const sch = buildSchedule({ ...base, preheatMin: 60, mixAt: new Date('2026-11-06T19:00:00') });
+    const r = replan({ formula: overnight, eatAt, stageH: 12, warmUpH: 1.5, plannedMixAt: new Date('2026-11-06T19:00:00'), preheatMin: 60 }, { mix: new Date('2026-11-06T19:30:00') });
+    const pre = r.steps.find((s) => s.key === 'preheat')!;
+    const bake = r.steps.find((s) => s.key === 'bake')!;
+    expect((bake.at.getTime() - pre.at.getTime()) / 60_000).toBe(60);
+    expect(r.steps.length).toBe(sch.steps.length);
+    expect(pre.at.getTime()).toBeGreaterThan(sch.steps.find((s) => s.key === 'preheat')!.at.getTime() - 1);
+  });
+
+  it('active dry is 1.25 x instant grams, with no teaspoon text', () => {
+    const balls = [{ count: 5, grams: 340 }];
+    const inst = computeRecipe({ formula: overnight, yeastPct: 0.0008, balls });
+    const ady = computeRecipe({ formula: overnight, yeastPct: 0.0008, balls, yeastType: 'activeDry' });
+    const y = (r: typeof inst) => r.parts.flatMap((p) => p.ingredients).find((i) => i.key === 'yeast')!;
+    expect(y(ady).pct).toBeCloseTo(y(inst).pct * 1.25, 10);
+    expect(y(ady).name).toBe('Active dry yeast');
+    expect(y(ady).tsp).toBeUndefined();
+    expect(y(inst).tsp).toBeDefined();
+  });
+
+  it('a typed yeast override is not converted again', () => {
+    const balls = [{ count: 5, grams: 340 }];
+    const common = { formula: overnight, balls, eatAt, roomF: 70, warmUpH: 1.5, temp: { bandLowF: 75, bandHighF: 78, frictionF: 2 } };
+    const a = planBatch({ ...common, manualYeastPct: 0.1, yeastType: 'activeDry' });
+    const b = planBatch({ ...common, manualYeastPct: 0.1, yeastType: 'instant' });
+    const g = (p: typeof a) => p.recipe.parts.flatMap((x) => x.ingredients).find((i) => i.key === 'yeast')!.grams;
+    expect(g(a)).toBe(g(b));
+  });
+});
+
+describe('stand mixer water', () => {
+  it('inside the room band, hand keeps the book water and a mixer calculates it cooler', () => {
+    const band = { bandLowF: 66, bandHighF: 74 };
+    const hand = waterTemps(overnight, 70, { ...band, frictionF: 2 });
+    const mixer = waterTemps(overnight, 70, { ...band, frictionF: 23, machineMixed: true });
+    expect(hand[0].basis).toBe('book');
+    expect(mixer[0].basis).toBe('calculated');
+    expect(mixer[0].highF).toBeLessThan(hand[0].lowF);
+  });
+});

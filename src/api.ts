@@ -11,10 +11,11 @@ import { replan, type Progress, type ProgressStep } from './engine/progress';
 import { downscalePhoto } from './data/photo';
 import { cancelReminders, pushPermission, pushSupported, scheduleReminders } from './data/push';
 import * as store from './data/store';
-import type { Actual, BakeSession, Batch, Oven, Settings, StepRecord } from './data/types';
+import type { Actual, BakeSession, Batch, Flour, Oven, Settings, StepRecord } from './data/types';
+import { ACTIVE_DRY_SOURCE, type YeastType } from './engine/formula';
 
-export type { Actual, BakeSession, Batch, BallGroup, DoughDefaults, Formula, Ingredient, Oven, Plan, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
-export { PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
+export type { Actual, BakeSession, Batch, BallGroup, Flour, YeastType, DoughDefaults, Formula, Ingredient, Oven, Plan, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
+export { ACTIVE_DRY_SOURCE, PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
 
 /** Backup reminder cadence, in bake sessions. */
 export const BACKUP_EVERY = 5;
@@ -138,6 +139,7 @@ export interface PlanForm {
   timing?: TimingMode;
   startAt?: Date;
   manualYeastPct?: number;
+  yeastType?: YeastType;
 }
 
 export function makePlan(form: PlanForm, s: Settings): Plan {
@@ -153,10 +155,14 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
     startAt: form.startAt,
     manualYeastPct: form.manualYeastPct,
     kitchenFactor: s.kitchenFactor,
+    mixer: form.mixer,
+    preheatMin: s.preheatMin,
+    yeastType: form.yeastType ?? s.yeastType,
     temp: {
       bandLowF: s.bandLowF,
       bandHighF: s.bandHighF,
       frictionF: form.mixer === 'mixer' ? s.frictionMixerF : s.frictionHandF,
+      machineMixed: form.mixer === 'mixer',
     },
   });
 }
@@ -164,7 +170,7 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
 const toRecord = (st: Step): StepRecord => ({ key: st.key, label: st.label, at: st.at.toISOString(), detail: st.detail });
 
 /** Save the plan as a batch. The planned part is frozen from here on. */
-export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer'): Promise<Batch> {
+export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour): Promise<Batch> {
   if (plan.errors.length) throw new Error(plan.errors.join(' '));
   const i = plan.input;
   const balls = i.balls.filter((b) => b.count > 0);
@@ -184,13 +190,17 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer'): Promise<Batch
       recipe: plan.recipe,
       water: plan.water,
       steps: plan.schedule.steps.map(toRecord),
+      stepVersion: 2 as const,
+      preheatMin: i.preheatMin,
+      yeastType: i.yeastType ?? 'instant',
+      flour,
     }),
     actual: {},
     sessions: [],
   };
   await store.saveBatch(batch);
   const s = await store.getSettings();
-  await store.saveSettings({ ...s, lastDoughId: i.formula.id, lastBalls: balls, roomF: i.roomF, mixer });
+  await store.saveSettings({ ...s, lastDoughId: i.formula.id, lastBalls: balls, roomF: i.roomF, mixer, yeastType: i.yeastType ?? s.yeastType, flour: flour ?? s.flour });
   return batch;
 }
 
@@ -220,6 +230,9 @@ export function batchProgress(b: Batch): Progress {
       warmUpH: p.warmUpH,
       eatAt: new Date(p.eatAt),
       plannedMixAt: new Date(mix?.at ?? p.eatAt),
+      // Older batches keep the steps they were planned with: by-hand text, no preheat.
+      mixer: p.stepVersion === 2 ? p.mixer : 'hand',
+      preheatMin: p.stepVersion === 2 ? p.preheatMin : undefined,
     },
     done,
   );
@@ -425,6 +438,32 @@ export async function doughHistory(): Promise<
     avgOverall: r.scores.length ? r.scores.reduce((a, c) => a + c, 0) / r.scores.length : undefined,
     bestBatchId: r.best?.id,
   }));
+}
+
+export const FLOUR_LABELS: Record<Flour, string> = { '00': '00', ap: 'All-purpose', bread: 'Bread flour', other: 'Other' };
+
+/** Average overall score per flour, for batches that recorded one. The baker draws the conclusion. */
+export async function flourHistory(): Promise<{ flour: Flour; label: string; bakes: number; rated: number; avgOverall?: number }[]> {
+  const by = new Map<Flour, { bakes: number; scores: number[] }>();
+  for (const b of await store.listBatches()) {
+    const fl = b.planned.flour;
+    if (!fl) continue;
+    const row = by.get(fl) ?? { bakes: 0, scores: [] };
+    for (const s of b.sessions) {
+      row.bakes += 1;
+      if (s.survey.overall) row.scores.push(s.survey.overall);
+    }
+    by.set(fl, row);
+  }
+  return [...by.entries()]
+    .filter(([, r]) => r.bakes > 0)
+    .map(([flour, r]) => ({
+      flour,
+      label: FLOUR_LABELS[flour],
+      bakes: r.bakes,
+      rated: r.scores.length,
+      avgOverall: r.scores.length ? r.scores.reduce((a, c) => a + c, 0) / r.scores.length : undefined,
+    }));
 }
 
 // ---------- calendar ----------

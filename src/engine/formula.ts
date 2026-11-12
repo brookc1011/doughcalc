@@ -9,7 +9,18 @@ export interface RecipeInput {
   flourG?: number;
   /** Overrides formula.residuePct. */
   residuePct?: number;
+  /** Yeast on hand. yeastPct is always instant; active dry is converted by ACTIVE_DRY_FACTOR. */
+  yeastType?: YeastType;
 }
+
+export type YeastType = 'instant' | 'activeDry';
+
+/**
+ * Active dry in place of instant: 25% more. Fleischmann's Yeast 101, America's Test Kitchen
+ * "Yeast Types", Bob's Red Mill. King Arthur and Red Star call them 1:1; we take the cautious side.
+ */
+export const ACTIVE_DRY_FACTOR = 1.25;
+export const ACTIVE_DRY_SOURCE = "Fleischmann's, America's Test Kitchen, Bob's Red Mill: 25% more active dry than instant";
 
 export interface Recipe {
   usableDoughG: number;
@@ -38,12 +49,16 @@ function tspFor(formula: Formula, grams: number): string | undefined {
   return hit?.text;
 }
 
-function ing(formula: Formula, key: Ingredient['key'], grams: number, flourTotal: number): Ingredient {
+function ing(formula: Formula, key: Ingredient['key'], grams: number, flourTotal: number, activeDry = false): Ingredient {
+  // Book teaspoon figures are for instant yeast, so active dry shows grams and % only.
+  if (key === 'yeast' && activeDry) return { key, name: 'Active dry yeast', grams, pct: grams / flourTotal };
   return { key, name: NAMES[key], grams, pct: grams / flourTotal, tsp: tspFor(formula, grams) };
 }
 
 export function computeRecipe(input: RecipeInput): Recipe {
-  const { formula: f, yeastPct } = input;
+  const { formula: f } = input;
+  const activeDry = input.yeastType === 'activeDry';
+  const yeastPct = input.yeastPct * (activeDry ? ACTIVE_DRY_FACTOR : 1);
   const residue = input.residuePct ?? f.residuePct;
   const errors: string[] = [];
   const ratioSum = 1 + f.hydration + f.salt + yeastPct + f.oil + f.sugar;
@@ -72,7 +87,7 @@ export function computeRecipe(input: RecipeInput): Recipe {
     ing(f, 'flour', flour, flour),
     ing(f, 'water', water, flour),
     ing(f, 'salt', salt, flour),
-    ing(f, 'yeast', yeast, flour),
+    ing(f, 'yeast', yeast, flour, activeDry),
   ];
   if (oil > 0) totals.push(ing(f, 'oil', oil, flour));
   if (sugar > 0) totals.push(ing(f, 'sugar', sugar, flour));
@@ -89,7 +104,7 @@ export function computeRecipe(input: RecipeInput): Recipe {
       );
     }
     // All commercial yeast goes into the poolish (FWSY p.226).
-    const poolish: Ingredient[] = [ing(f, 'flour', pf, flour), ing(f, 'water', pw, flour), ing(f, 'yeast', yeast, flour)];
+    const poolish: Ingredient[] = [ing(f, 'flour', pf, flour), ing(f, 'water', pw, flour), ing(f, 'yeast', yeast, flour, activeDry)];
     const finalDough: Ingredient[] = [
       ing(f, 'flour', flour - pf, flour),
       ing(f, 'water', Math.max(finalWater, 0), flour),

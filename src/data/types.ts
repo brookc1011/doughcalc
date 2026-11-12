@@ -1,5 +1,5 @@
 import type { Survey } from '../engine/advice';
-import type { Recipe } from '../engine/formula';
+import type { Recipe, YeastType } from '../engine/formula';
 import type { WaterTemp } from '../engine/temperature';
 import type { BallGroup, Formula, YeastResult } from '../engine/types';
 
@@ -35,7 +35,16 @@ export interface Settings {
   reminderLeadMin?: number;
   /** Random id naming this phone's reminder slot on the server. Created on first "Remind me". */
   pushDeviceId?: string;
+  /** Oven preheat before the first pizza, minutes. Optional, so no migration; default in DEFAULT_SETTINGS. */
+  preheatMin?: number;
+  /** Yeast on hand. Missing = instant. */
+  yeastType?: YeastType;
+  /** Flour last used, carried to the next plan. */
+  flour?: Flour;
 }
+
+/** Flour choices tracked per batch. Info only: the steps don't change (see helpCopy "flour"). */
+export type Flour = '00' | 'ap' | 'bread' | 'other';
 
 export interface StepRecord {
   key: string;
@@ -57,6 +66,14 @@ export interface PlannedSnapshot {
   recipe: Recipe;
   water: WaterTemp[];
   steps: StepRecord[];
+  /**
+   * Batches locked from this version on carry these. Older batches have none: their checklist keeps
+   * the by-hand text and no preheat step, as they were planned. Optional, so no migration.
+   */
+  stepVersion?: 2;
+  preheatMin?: number;
+  yeastType?: YeastType;
+  flour?: Flour;
 }
 
 /** What actually happened. Editable any time. */
