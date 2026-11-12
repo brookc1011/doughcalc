@@ -56,7 +56,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
 
       {flours.length >= 2 && (
         <section className="card">
-          <h2>By flour</h2>
+          <h2>Your ratings by flour</h2>
           {flours.map((f) => (
             <div key={f.flour} className="session">
               <div className="row between">

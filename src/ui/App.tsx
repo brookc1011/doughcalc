@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { getSettings, requestPersistence, retryReminders, type Settings } from '../api';
+import { getSettings, requestPersistence, retryReminders, type Batch, type Settings } from '../api';
 import { BatchScreen } from './BatchScreen';
 import { DoughEditor, DoughsScreen } from './DoughsScreen';
 import { HistoryScreen } from './HistoryScreen';
 import { PlanScreen } from './PlanScreen';
 import { SettingsScreen } from './SettingsScreen';
 
+type RepeatBake = Pick<Batch['planned'], 'formula' | 'balls' | 'mixer' | 'yeastType' | 'flour'>;
+
 export type Route =
-  | { name: 'plan' }
+  | { name: 'plan'; fromBatch?: string; repeat?: RepeatBake }
   | { name: 'history' }
   | { name: 'settings' }
   | { name: 'batch'; id: string }
@@ -15,6 +17,13 @@ export type Route =
   | { name: 'dough'; id: string };
 
 const same = (a?: Route, b?: Route) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+
+function fieldAndBarButton(target: EventTarget | null): HTMLElement | undefined {
+  const field = document.activeElement;
+  if (!(field instanceof HTMLElement) || !field.matches('input:not([type=file]), select, textarea')) return;
+  if (target instanceof Element && target.closest(':is(.plan-action, .editor-action, .batch-jumps, nav.tabs) button')
+      && window.matchMedia('(any-pointer: coarse)').matches) return field;
+}
 
 export function App() {
   const [route, setRoute] = useState<Route>({ name: 'plan' });
@@ -85,9 +94,16 @@ export function App() {
   if (!settings) return <p className="pad">Loading…</p>;
 
   return (
-    <div className="app">
+    <div className="app"
+      onMouseDownCapture={(event) => {
+        // On touch layouts, blurring a field moves these bars. Keep the pressed
+        // button under the pointer until click has a confirmed target.
+        if (fieldAndBarButton(event.target)) event.preventDefault();
+      }}
+      onClickCapture={(event) => fieldAndBarButton(event.target)?.blur()}
+    >
       <main>
-        {route.name === 'plan' && <PlanScreen settings={settings} go={go} onSaved={reloadSettings} />}
+        {route.name === 'plan' && <PlanScreen key={route.fromBatch} repeat={route.repeat} settings={settings} go={go} onSaved={reloadSettings} />}
         {route.name === 'history' && <HistoryScreen settings={settings} go={go} />}
         {route.name === 'settings' && <SettingsScreen settings={settings} onChange={reloadSettings} go={go} />}
         {route.name === 'doughs' && <DoughsScreen go={go} onChange={reloadSettings} />}
@@ -97,7 +113,7 @@ export function App() {
         )}
       </main>
       <nav className="tabs" aria-label="Main navigation">
-        <button aria-current={route.name === 'plan' ? 'page' : undefined} className={route.name === 'plan' ? 'on' : ''} onClick={() => go({ name: 'plan' })}>
+        <button aria-current={route.name === 'plan' ? 'page' : undefined} className={route.name === 'plan' ? 'on' : ''} onClick={() => { if (route.name !== 'plan') go({ name: 'plan' }); }}>
           Plan
         </button>
         <button

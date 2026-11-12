@@ -96,6 +96,11 @@ export function BatchScreen({
       <p className="muted small">
         Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${FLOUR_LABELS[p.flour]} flour` : ''}.
       </p>
+      <button className="small" onClick={() => go({
+        name: 'plan',
+        fromBatch: batch.id,
+        repeat: { formula: p.formula, balls: p.balls, mixer: p.mixer, yeastType: p.yeastType, flour: p.flour },
+      })}>Same dough again</button>
 </section>
 
       <section id={BATCH_TARGETS.rating} tabIndex={-1} aria-label="Bake feedback">
@@ -138,6 +143,27 @@ export function BatchScreen({
 }
 
 const timeOnly = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+function StepCountdown({ at }: { at: number }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const timer = window.setInterval(refresh, 15_000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('pageshow', refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('pageshow', refresh);
+    };
+  }, []);
+  const minutes = Math.ceil((at - now) / 60_000);
+  if (minutes <= 0) return <> · due now</>;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const duration = hours ? [hours + ' hr', rest && rest + ' min'].filter(Boolean).join(' ') : minutes + ' min';
+  return <> · in {duration}</>;
+}
 
 /** The batch's steps as a checklist. Checking one off re-times the steps after it. */
 function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => void }) {
@@ -225,7 +251,7 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
           const state = stepPresentation(s, prog.nextKey);
           return (
             <li key={s.key} className={state} aria-current={state === 'next' ? 'step' : undefined}>
-              {state === 'next' && <p className="eyebrow next-label">Up next</p>}
+              {state === 'next' && <p className="eyebrow next-label">Up next{firstUntouched !== s.key && <StepCountdown at={s.at.getTime()} />}</p>}
               <div className="step-heading">
                 <b>{s.doneAt ? '✓ ' : ''}{s.label}</b>
                 {s.doneAt && (

@@ -45,18 +45,19 @@ const TIMING_INTRO: Record<TimingMode, string> = {
   both: 'Pick your dough. We’ll fit it between start and bake.',
 };
 
-export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
+export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract<Route, { name: 'plan' }>['repeat']; settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
   const unit = settings.unit;
   const [doughs, setDoughs] = useState<Formula[]>([]);
-  const [doughId, setDoughId] = useState(settings.lastDoughId);
-  const [balls, setBalls] = useState<BallGroup[]>(settings.lastBalls);
+  const [doughId, setDoughId] = useState(repeat?.formula.id ?? settings.lastDoughId);
+  const [balls, setBalls] = useState<BallGroup[]>(repeat?.balls ?? settings.lastBalls);
   const [eatAt, setEatAt] = useState(toLocalInput(tomorrowAt(18)));
   const [timing, setTiming] = useState<TimingMode>('eat');
   const [startAt, setStartAt] = useState(toLocalInput(defaultStart()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
-  const [mixer, setMixer] = useState<'hand' | 'mixer'>(settings.mixer);
-  const [yeastType, setYeastType] = useState<YeastType>(settings.yeastType ?? 'instant');
-  const [flour, setFlour] = useState<Flour | ''>(settings.flour ?? '');
+  const [mixer, setMixer] = useState<'hand' | 'mixer'>(repeat?.mixer ?? settings.mixer);
+  const [yeastType, setYeastType] = useState<YeastType>(repeat ? repeat.yeastType ?? 'instant' : settings.yeastType ?? 'instant');
+  const [flour, setFlour] = useState<Flour | ''>(repeat ? repeat.flour ?? '' : settings.flour ?? '');
+  const [useSnapshot, setUseSnapshot] = useState(!!repeat);
   const [details, setDetails] = useState(false);
   const [stageH, setStageH] = useState<number | undefined>();
   const [manualYeast, setManualYeast] = useState('');
@@ -78,14 +79,15 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     allDoughs().then((list) => {
       setDoughs(list);
       const start = list.find((d) => d.id === settings.lastDoughId) ?? list[0];
-      if (start) applyDefaults(start);
+      if (start && !repeat) applyDefaults(start);
     });
   }, []);
 
   // Any change after saving re-enables "Always start this dough this way".
   useEffect(() => setDefaultsSaved(false), [balls, eatAt, mixer]);
 
-  const base = doughs.find((d) => d.id === doughId) ?? doughs[0];
+  const savedFormula = doughs.find((d) => d.id === doughId);
+  const base = useSnapshot ? repeat?.formula : savedFormula ?? doughs[0];
   const formula: Formula | undefined = base && { ...base, ...edits };
   const edited = Object.keys(edits).length > 0;
 
@@ -123,6 +125,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     setBalls(balls.map((b, j) => (j === i ? { ...b, ...patch } : b)));
 
   const pickDough = (id: string) => {
+    setUseSnapshot(false);
     setEdits({});
     setStageH(undefined);
     const f = doughs.find((d) => d.id === id);
@@ -131,6 +134,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
 
   /** Save the current balls, eat-at hour and mixer as this dough's starting values. */
   const saveDefaults = async () => {
+    const base = savedFormula;
     if (!base) return;
     await saveDough({
       ...base,
@@ -145,6 +149,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     if (!name) return;
     const mine = await cloneDough(formula, name);
     setDoughs(await allDoughs());
+    setUseSnapshot(false);
     setDoughId(mine.id);
     setEdits({});
   };
@@ -168,7 +173,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
     <div className="pad">
       <p className="eyebrow">A little planning. Great pizza.</p>
       <h1>Plan a bake</h1>
-      <p className="intro">{TIMING_INTRO[timing]}</p>
+      <p className="intro">{useSnapshot ? 'Choose a new time for this dough.' : TIMING_INTRO[timing]}</p>
 
       <section className="card plan-inputs">
         <div className="row between field-heading">
@@ -178,9 +183,10 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             </button>
         </div>
           <select id="plan-dough" value={doughId} onChange={(e) => pickDough(e.target.value)}>
+            {useSnapshot && !savedFormula && <option value={doughId}>{base?.name}</option>}
             {doughs.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.name}
+                {useSnapshot && d.id === doughId ? base?.name : d.name}
               </option>
             ))}
           </select>
@@ -203,7 +209,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </div>
         ))}
         <div className="save-defaults-row">
-          <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved}>
+          <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved || !savedFormula}>
             {defaultsSaved ? 'Saved' : 'Save defaults'}
           </button>
           <Info label="saved defaults">{HELP_COPY["saved defaults"]}</Info>
@@ -237,7 +243,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
         )}
         {timing !== 'start' && (
           <label>
-            Bake at <span className="field-hint">first pizza in</span>
+            First pizza in the oven at
             <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
           </label>
         )}
@@ -263,38 +269,37 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
           </span>
           <NumField value={room} onValue={setRoom} />
         </label>
-        <label>
-          <span>
-            Mixing
-            <Info label="mixing method">{HELP_COPY["mixing method"]}</Info>
-          </span>
-          <select value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
-            <option value="hand">By hand</option>
-            <option value="mixer">Stand mixer</option>
-          </select>
-        </label>
-        <label>
-            <span>
-              Yeast
+        <fieldset className="bake-setup">
+          <legend>Mixing &amp; ingredients</legend>
+          <div className="setup-fields">
+            <div className="setup-row">
+              <label htmlFor="plan-mixing">Mixing</label>
+              <Info label="mixing method">{HELP_COPY["mixing method"]}</Info>
+              <select id="plan-mixing" value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
+                <option value="hand">By hand</option>
+                <option value="mixer">Stand mixer</option>
+              </select>
+            </div>
+            <div className="setup-row">
+              <label htmlFor="plan-yeast">Yeast</label>
               <Info label="yeast type">{HELP_COPY["yeast type"]}</Info>
-            </span>
-            <select value={yeastType} onChange={(e) => setYeastType(e.target.value as YeastType)}>
-              <option value="instant">Instant</option>
-              <option value="activeDry">Active dry</option>
-            </select>
-        </label>
-        <label>
-            <span>
-              Flour
+              <select id="plan-yeast" value={yeastType} onChange={(e) => setYeastType(e.target.value as YeastType)}>
+                <option value="instant">Instant</option>
+                <option value="activeDry">Active dry</option>
+              </select>
+            </div>
+            <div className="setup-row">
+              <label htmlFor="plan-flour">Flour</label>
               <Info label="flour" links={FLOUR_SOURCES}>{HELP_COPY["flour"]}</Info>
-            </span>
-            <select value={flour} onChange={(e) => setFlour(e.target.value as Flour | '')}>
-              <option value="">Not set</option>
-              {(Object.keys(FLOUR_LABELS) as Flour[]).map((k) => (
-                <option key={k} value={k}>{FLOUR_LABELS[k]}</option>
-              ))}
-            </select>
-        </label>
+              <select id="plan-flour" value={flour} onChange={(e) => setFlour(e.target.value as Flour | '')}>
+                <option value="">Not set</option>
+                {(Object.keys(FLOUR_LABELS) as Flour[]).map((k) => (
+                  <option key={k} value={k}>{FLOUR_LABELS[k]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </fieldset>
       </section>
 
       {plan.errors.map((e) => (
@@ -365,7 +370,7 @@ export function PlanScreen({ settings, go, onSaved }: { settings: Settings; go: 
             </label>
           </div>
 
-          {(edited || isPreset(formula)) && (
+          {(edited || useSnapshot || isPreset(formula)) && (
             <button className="small" onClick={saveAsMine}>
               Save as My Dough
             </button>
