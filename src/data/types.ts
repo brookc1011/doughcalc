@@ -70,7 +70,7 @@ export interface PlannedSnapshot {
    * Batches locked from this version on carry these. Older batches have none: their checklist keeps
    * the by-hand text and no preheat step, as they were planned. Optional, so no migration.
    */
-  stepVersion?: 2;
+  stepVersion?: 2 | 3;
   preheatMin?: number;
   yeastType?: YeastType;
   flour?: Flour;

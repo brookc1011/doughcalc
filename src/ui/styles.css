@@ -893,3 +893,5 @@ input, select, textarea {
   .setup-row { grid-template-columns: auto 1fr; }
   .setup-row select { grid-area: auto / 1 / auto / -1; }
 }
+
+.step-gap { margin-top: 4px; font-weight: 600; }

@@ -9,6 +9,7 @@ import { suggestions, topSuggestion } from '../src/engine/advice';
 import { planBatch } from '../src/engine/plan';
 import { replan } from '../src/engine/progress';
 import type { Formula } from '../src/engine/types';
+import { ballCut, fmtDuration, gapToNext } from '../src/engine/stepText';
 
 const overnight = getPreset('forkish-overnight')!;
 const sameDay = getPreset('forkish-same-day')!;
@@ -394,5 +395,44 @@ describe('stand mixer water', () => {
     expect(hand[0].basis).toBe('book');
     expect(mixer[0].basis).toBe('calculated');
     expect(mixer[0].highF).toBeLessThan(hand[0].lowF);
+  });
+});
+
+describe('step text helpers', () => {
+  it('formats durations', () => {
+    expect(fmtDuration(25 * 60_000)).toBe('25 min');
+    expect(fmtDuration(12 * 3_600_000)).toBe('12 h');
+    expect(fmtDuration(90 * 60_000)).toBe('1 h 30 min');
+  });
+  it('says how long until the next step', () => {
+    const steps = [
+      { label: 'Autolyse', at: new Date('2026-11-06T19:00:00') },
+      { label: 'Mix in salt and yeast', at: '2026-11-06T19:25:00' },
+    ];
+    expect(gapToNext(steps, 0)).toBe('Then 25 min until Mix in salt and yeast');
+    expect(gapToNext(steps, 1)).toBeUndefined();
+    expect(gapToNext([steps[0], { label: 'Into the fridge', at: steps[0].at }], 0)).toBe('Then right away: Into the fridge');
+  });
+  it('describes the cut', () => {
+    expect(ballCut([{ count: 5, grams: 340 }])).toBe('5 pieces of 340 g');
+    expect(ballCut([{ count: 5, grams: 340 }, { count: 2, grams: 200 }])).toBe('5 of 340 g and 2 of 200 g (7 pieces)');
+  });
+});
+
+describe('full step text (poolish)', () => {
+  it('names the poolish and final-mix grams', () => {
+    const p = planBatch({
+      formula: poolish,
+      balls: [{ count: 5, grams: 340 }],
+      roomF: 70,
+      warmUpH: 1.5,
+      temp: { bandLowF: 66, bandHighF: 74, frictionF: 2 },
+      mixAt: new Date('2026-11-06T19:00:00'),
+      eatAt: new Date('2026-11-07T18:00:00'),
+    });
+    const steps = p.schedule.steps;
+    const pf = p.recipe.parts[0].ingredients.find((i) => i.key === 'flour')!.grams;
+    expect(steps[0].detail).toContain(`Mix ${Math.round(pf).toLocaleString('en-US')} g flour`);
+    expect(steps.find((s) => s.key === 'mix')!.detail).toContain('Add all the poolish');
   });
 });

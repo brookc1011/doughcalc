@@ -7,6 +7,7 @@ import {
   fmtPct,
   fmtTempRange,
   fmtWhen,
+  gapToNext,
   stepCalendarLink,
   type Plan,
 } from '../api';
@@ -107,7 +108,7 @@ export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: st
         </button>
       </div>
       <ol className="timeline">
-        {steps.map((s) => (
+        {steps.map((s, i) => (
           <li key={s.key + String(s.at)}>
             <div className="row between">
               <b>{s.label}</b>
@@ -117,6 +118,7 @@ export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: st
             </div>
             <div className="step-time">{fmtWhen(s.at)}</div>
             <div className="muted small">{s.detail}</div>
+            {gapToNext(steps, i) && <div className="small step-gap">{gapToNext(steps, i)}</div>}
           </li>
         ))}
       </ol>

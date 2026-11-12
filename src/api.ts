@@ -125,6 +125,7 @@ export function ballForDiameter(refBallG: number, refDiameterIn: number, newDiam
 }
 
 export { defaultStageH };
+export { gapToNext } from './engine/stepText';
 
 // ---------- planning ----------
 export interface PlanForm {
@@ -190,7 +191,7 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
       recipe: plan.recipe,
       water: plan.water,
       steps: plan.schedule.steps.map(toRecord),
-      stepVersion: 2 as const,
+      stepVersion: 3 as const,
       preheatMin: i.preheatMin,
       yeastType: i.yeastType ?? 'instant',
       flour,
@@ -231,8 +232,10 @@ export function batchProgress(b: Batch): Progress {
       eatAt: new Date(p.eatAt),
       plannedMixAt: new Date(mix?.at ?? p.eatAt),
       // Older batches keep the steps they were planned with: by-hand text, no preheat.
-      mixer: p.stepVersion === 2 ? p.mixer : 'hand',
-      preheatMin: p.stepVersion === 2 ? p.preheatMin : undefined,
+      mixer: p.stepVersion ? p.mixer : 'hand',
+      preheatMin: p.stepVersion ? p.preheatMin : undefined,
+      // Version 3 on: full step text with this batch's grams.
+      amounts: p.stepVersion === 3 ? { parts: p.recipe.parts, water: p.water, balls: p.balls } : undefined,
     },
     done,
   );

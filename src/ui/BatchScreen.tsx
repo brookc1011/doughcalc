@@ -11,6 +11,7 @@ import {
   FLOUR_LABELS,
   fmtTemp,
   fmtWhen,
+  gapToNext,
   getBatch,
   photoUrl,
   pushPermission,
@@ -247,8 +248,9 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
       )}
 
       <ol className="timeline checklist-steps">
-        {prog.steps.map((s) => {
+        {prog.steps.map((s, i) => {
           const state = stepPresentation(s, prog.nextKey);
+          const gap = gapToNext(prog.steps, i);
           return (
             <li key={s.key} className={state} aria-current={state === 'next' ? 'step' : undefined}>
               {state === 'next' && <p className="eyebrow next-label">Up next{firstUntouched !== s.key && <StepCountdown at={s.at.getTime()} />}</p>}
@@ -267,6 +269,7 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
                 </div>
               )}
               {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.detail}</div>}
+              {!s.doneAt && !s.passed && gap && <div className="small step-gap">{gap}</div>}
               {!s.doneAt && !s.passed && (
                 <div className="step-actions">
                   <button className={state === 'next' ? 'small primary-small' : 'small'} aria-label={`Mark ${s.label} done now`} onClick={() => check(s.key)}>

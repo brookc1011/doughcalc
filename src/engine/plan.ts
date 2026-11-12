@@ -111,6 +111,7 @@ export function planBatch(raw: PlanInput): Plan {
     mixAt: input.mixAt,
     mixer: input.mixer,
     preheatMin: input.preheatMin,
+    amounts: { parts: recipe.parts, water, balls: input.balls },
   });
 
   const errors = [...recipe.errors, ...schedule.errors];

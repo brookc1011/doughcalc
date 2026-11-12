@@ -185,7 +185,7 @@ describe('bake help: method, preheat, yeast, flour', () => {
 
   it('new batches carry a preheat step and the chosen method through the checklist', async () => {
     const b = await api.lockIn(await plan('mixer'), 'mixer', 'ap');
-    expect(b.planned.stepVersion).toBe(2);
+    expect(b.planned.stepVersion).toBe(3);
     expect(b.planned.flour).toBe('ap');
     const steps = api.batchProgress(b).steps;
     expect(steps.some((s) => s.key === 'preheat')).toBe(true);
@@ -199,6 +199,24 @@ describe('bake help: method, preheat, yeast, flour', () => {
     const steps = api.batchProgress(old).steps;
     expect(steps.some((s) => s.key === 'preheat')).toBe(false);
     expect(steps.find((s) => s.key === 'mix')!.detail).toContain('pincer');
+  });
+
+  it('new batches spell out the batch grams in the step text', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    const steps = api.batchProgress(b).steps;
+    const water = b.planned.recipe.parts[0].ingredients.find((i) => i.key === 'water')!.grams;
+    const salt = b.planned.recipe.parts[0].ingredients.find((i) => i.key === 'salt')!.grams;
+    const first = steps[0].detail;
+    expect(first).toContain(`${Math.round(water).toLocaleString('en-US')} g water`);
+    expect(first).toContain('3 tbsp');
+    expect(steps.find((s) => s.key === 'mix')!.detail).toContain(`${Math.round(salt)} g salt`);
+    expect(steps.find((s) => s.key === 'ball')!.detail).toMatch(/cut \d+ pieces? of \d+ g/);
+  });
+
+  it('a version-2 batch keeps the short step text', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    const v2 = { ...b, planned: { ...b.planned, stepVersion: 2 as const } };
+    expect(api.batchProgress(v2).steps[0].detail).not.toContain('3 tbsp');
   });
 
   it('active dry from the form is stored on the batch', async () => {

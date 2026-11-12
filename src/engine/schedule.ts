@@ -1,4 +1,5 @@
 import { mixSteps, preheatDetail, type MixMethod } from './methods';
+import { fullStepText, type StepAmounts } from './stepText';
 import type { Formula } from './types';
 
 export type StepKey = 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'preheat' | 'bake';
@@ -25,6 +26,8 @@ export interface ScheduleInput {
   mixer?: MixMethod;
   /** Minutes of oven preheat before the first pizza goes in. Omitted: no preheat step (older batches). */
   preheatMin?: number;
+  /** This batch's amounts. Set: full step text with grams (stepVersion 3). Omitted: the short text. */
+  amounts?: StepAmounts;
 }
 
 export interface Schedule {
@@ -90,37 +93,38 @@ export function buildSchedule(input: ScheduleInput): Schedule {
     errors.push(`Too long: the book keeps balls up to ${p.maxHoldH / 24} days in the fridge.`);
   }
 
+  const ddt = `${f.ddtF[0]}${f.ddtF[1] !== f.ddtF[0] ? `-${f.ddtF[1]}` : ''}°F`;
+  const full = input.amounts && fullStepText(input.amounts, input.mixer ?? 'hand', ddt, stageH);
   const steps: Step[] = [];
   if (isPoolish) {
     steps.push({
       key: 'poolish',
       label: 'Mix the poolish',
       at: add(mix, -stageH * H),
-      detail: `Flour, 80°F water and yeast, just until incorporated. Leave out overnight (${stageH} h).`,
+      detail: full?.poolish ?? `Flour, 80°F water and yeast, just until incorporated. Leave out overnight (${stageH} h).`,
     });
   } else if (p.autolyseMin > 0) {
     steps.push({
       key: 'autolyse',
       label: 'Autolyse',
       at: add(mix, -p.autolyseMin * M),
-      detail: 'Hydrate the yeast in a little of the water. Mix flour with the rest of the water; cover and rest.',
+      detail: full?.autolyse ?? 'Hydrate the yeast in a little of the water. Mix flour with the rest of the water; cover and rest.',
     });
   }
   const how = mixSteps(input.mixer ?? 'hand', isPoolish);
-  const ddt = `${f.ddtF[0]}${f.ddtF[1] !== f.ddtF[0] ? `-${f.ddtF[1]}` : ''}°F`;
   steps.push({
     key: 'mix',
     label: isPoolish ? 'Mix the final dough' : 'Mix in salt and yeast',
     at: mix,
-    detail: `${how.mix} Target dough temp ${ddt}.`,
+    detail: full?.mix ?? `${how.mix} Target dough temp ${ddt}.`,
   });
   steps.push({
     key: 'fold',
     label: 'Fold',
     at: add(mix, p.foldAfterMin * M),
-    detail: how.fold,
+    detail: full?.fold ?? how.fold,
   });
-  steps.push({ key: 'ball', label: 'Divide and ball', at: ball, detail: 'Medium-tight rounds; do not degas.' });
+  steps.push({ key: 'ball', label: 'Divide and ball', at: ball, detail: full?.ball ?? 'Medium-tight rounds; do not degas.' });
   // Room-proofed doughs baked much later than their minimum go in the fridge after a short rest
   // (FWSY p.219: rest 30-60 minutes, then refrigerate).
   const heldCold = fridge || ballAgeH > p.minProofH + warmUpH;
@@ -129,13 +133,13 @@ export function buildSchedule(input: ScheduleInput): Schedule {
       key: 'fridge',
       label: 'Into the fridge',
       at: fridge ? ball : add(ball, 60 * M),
-      detail: 'Covered, on a lightly floured tray.',
+      detail: full?.fridge ?? 'Covered, on a lightly floured tray.',
     });
     steps.push({
       key: 'pull',
       label: 'Take balls out of the fridge',
       at: add(eatAt, -warmUpH * H),
-      detail: 'Leave covered at room temperature until they stretch easily.',
+      detail: full?.pull(warmUpH) ?? 'Leave covered at room temperature until they stretch easily.',
     });
   }
   if (input.preheatMin && input.preheatMin > 0) {
