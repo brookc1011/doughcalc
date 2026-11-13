@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { doughHistory, flourHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
+import { productOf, type Product, doughHistory, flourHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
 import type { Route } from './App';
-import { KitchenMark } from './common';
+import { Chips, KitchenMark } from './common';
 
 type History = Awaited<ReturnType<typeof doughHistory>>;
 type FlourRows = Awaited<ReturnType<typeof flourHistory>>;
@@ -19,11 +19,17 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
     flourHistory().then(setFlours);
   }, []);
 
-  const latestTry = batches.find((b) => b.nextTry)?.nextTry;
+  const [filter, setFilter] = useState<Product | 'all'>('all');
+  const visible = batches.filter(b => filter === 'all' || productOf(b.planned.formula) === filter);
+  const doughIds = new Set(visible.map(b => b.planned.formula.id));
+  const trends = hist.filter(h => doughIds.has(h.doughId));
+  const latestTry = visible.find((b) => b.nextTry)?.nextTry;
 
   return (
     <div className="pad">
-      <p className="eyebrow">Your pizza notebook</p><h1>Bakes</h1><p className="intro">A little better with every bake.</p>
+      <p className="eyebrow">Your bake notebook</p><h1>Bakes</h1><p className="intro">A little better with every bake.</p>
+
+      <Chips value={filter} onChange={setFilter} options={[{ v: 'all', label: 'All' }, { v: 'pizza', label: 'Pizza' }, { v: 'bread', label: 'Bread' }]} />
 
       {latestTry && (
         <section className="card highlight">
@@ -32,10 +38,10 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
         </section>
       )}
 
-      {hist.length > 0 && (
+      {trends.length > 0 && (
         <section className="card">
           <h2>By dough</h2>
-          {hist.map((h) => (
+          {trends.map((h) => (
             <div key={h.doughId} className="session">
               <div className="row between">
                 <b>{h.name}</b>
@@ -54,7 +60,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
         </section>
       )}
 
-      {flours.length >= 2 && (
+      {filter === 'all' && flours.length >= 2 && (
         <section className="card">
           <h2>Your ratings by flour</h2>
           {flours.map((f) => (
@@ -71,7 +77,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
         </section>
       )}
 
-      {tally && tally.early + tally.onTime + tally.late > 0 && (
+      {filter === 'all' && tally && tally.early + tally.onTime + tally.late > 0 && (
         <section className="card">
           <h2>Dough timing</h2>
           <dl className="timing-tally">
@@ -86,9 +92,9 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
       )}
 
       <section className="card">
-        <h2>All batches</h2>
-        {batches.length === 0 && <div className="empty-note"><KitchenMark kind="dough" /><p className="muted">Nothing yet. Plan a bake and lock it in.</p></div>}
-        {batches.map((b) => {
+        <h2>{filter === 'all' ? 'All batches' : filter === 'bread' ? 'Bread batches' : 'Pizza batches'}</h2>
+        {visible.length === 0 && <div className="empty-note"><KitchenMark kind="dough" /><p className="muted">Nothing yet. Plan a bake and lock it in.</p></div>}
+        {visible.map((b) => {
           const scores = b.sessions.map((s) => s.survey.overall).filter(Boolean);
           return (
             <button key={b.id} className="listrow" onClick={() => go({ name: 'batch', id: b.id })}>
@@ -96,7 +102,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
                 <b>{b.title}</b>
                 <span>{scores.length ? `${scores.join(', ')}/5` : 'not rated'}</span>
               </div>
-              <div className="muted small">{fmtWhen(b.planned.eatAt)}</div>
+              <div className="muted small">{productOf(b.planned.formula) === 'bread' ? 'Bread' : 'Pizza'} · {fmtWhen(b.planned.eatAt)}</div>
             </button>
           );
         })}

@@ -3,10 +3,10 @@
 import { readyTally, suggestions, topSuggestion, type ReadyTally, type Suggestion, type Survey } from './engine/advice';
 import { googleCalendarLink, stepsToIcs } from './engine/calendar';
 import { rescaleBall, roundArea } from './engine/geometry';
-import { defaultStageH, planBatch, type Plan, type TimingMode } from './engine/plan';
+import { defaultStageH, planBatch, timingModes, type Plan, type TimingMode } from './engine/plan';
 import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
-import type { BallGroup, DoughDefaults, Formula, Ingredient } from './engine/types';
+import { productOf, type BallGroup, type DoughDefaults, type Formula, type Ingredient, type Product } from './engine/types';
 import { replan, type Progress, type ProgressStep } from './engine/progress';
 import { downscalePhoto } from './data/photo';
 import { cancelReminders, pushPermission, pushSupported, scheduleReminders } from './data/push';
@@ -14,8 +14,9 @@ import * as store from './data/store';
 import type { Actual, BakeSession, Batch, Flour, Oven, Settings, StepRecord } from './data/types';
 import { ACTIVE_DRY_SOURCE, type YeastType } from './engine/formula';
 
-export type { Actual, BakeSession, Batch, BallGroup, Flour, YeastType, DoughDefaults, Formula, Ingredient, Oven, Plan, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
-export { ACTIVE_DRY_SOURCE, PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion };
+export type { Actual, BakeSession, Batch, BallGroup, Flour, YeastType, DoughDefaults, Formula, Ingredient, Oven, Plan, Product, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
+export type { Crust, Crumb, Loaf } from './engine/advice';
+export { ACTIVE_DRY_SOURCE, PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion, productOf, timingModes };
 
 /** Backup reminder cadence, in bake sessions. */
 export const BACKUP_EVERY = 5;
@@ -46,7 +47,8 @@ export interface DoughEntry {
   hidden: boolean;
 }
 
-export async function doughLibrary(): Promise<DoughEntry[]> {
+/** Every dough, pizza and bread. */
+async function fullLibrary(): Promise<DoughEntry[]> {
   const s = await store.getSettings();
   const mine = await store.listDoughs();
   const byId = new Map(mine.map((d) => [d.id, d]));
@@ -62,14 +64,30 @@ export async function doughLibrary(): Promise<DoughEntry[]> {
   return [...book, ...custom];
 }
 
-/** Doughs shown in the Plan picker. */
-export async function allDoughs(): Promise<Formula[]> {
-  return (await doughLibrary()).filter((e) => !e.hidden).map((e) => e.formula);
+/** The dough library for one product (pizza by default, as before bread existed). */
+export async function doughLibrary(product: Product = 'pizza'): Promise<DoughEntry[]> {
+  return (await fullLibrary()).filter((e) => productOf(e.formula) === product);
 }
 
-export async function findDough(id: string): Promise<Formula> {
-  const lib = await doughLibrary();
-  return lib.find((e) => e.formula.id === id)?.formula ?? lib.find((e) => !e.hidden)?.formula ?? PRESETS[0];
+/** Doughs shown in the Plan picker for one product. */
+export async function allDoughs(product: Product = 'pizza'): Promise<Formula[]> {
+  return (await doughLibrary(product)).filter((e) => !e.hidden).map((e) => e.formula);
+}
+
+/** A dough by id (any product). Missing: the first visible dough of `product`. */
+export async function findDough(id: string, product?: Product): Promise<Formula> {
+  const lib = await fullLibrary();
+  const found = lib.find((e) => e.formula.id === id)?.formula;
+  if (found) return found;
+  const want = product ?? 'pizza';
+  const same = lib.filter((e) => productOf(e.formula) === want);
+  return same.find((e) => !e.hidden)?.formula ?? same[0]?.formula ?? PRESETS[0];
+}
+
+/** The dough to open the Plan screen on for a product: the last one you locked in. */
+export async function lastDoughId(product: Product): Promise<string | undefined> {
+  const s = await store.getSettings();
+  return product === 'bread' ? s.lastBreadDoughId : s.lastDoughId;
 }
 
 export function isPreset(f: Formula): boolean {
@@ -98,16 +116,23 @@ export async function resetDough(id: string): Promise<void> {
 
 /** Delete your own dough, or hide a book dough. At least one dough always stays. */
 export async function removeDough(id: string): Promise<void> {
-  const lib = await doughLibrary();
-  const visible = lib.filter((e) => !e.hidden);
+  const all = await fullLibrary();
+  const target = all.find((e) => e.formula.id === id);
+  const product = target ? productOf(target.formula) : 'pizza';
+  // At least one dough of each product stays.
+  const visible = all.filter((e) => !e.hidden && productOf(e.formula) === product);
   if (visible.length <= 1 && visible[0]?.formula.id === id) throw new Error('Keep at least one dough.');
   const s = await store.getSettings();
-  const nextLast = s.lastDoughId === id ? visible.find((e) => e.formula.id !== id)!.formula.id : s.lastDoughId;
+  const other = () => visible.find((e) => e.formula.id !== id)!.formula.id;
+  const last =
+    product === 'bread'
+      ? { lastBreadDoughId: s.lastBreadDoughId === id ? other() : s.lastBreadDoughId }
+      : { lastDoughId: s.lastDoughId === id ? other() : s.lastDoughId };
   if (isPresetId(id)) {
-    await store.saveSettings({ ...s, hiddenDoughIds: [...new Set([...s.hiddenDoughIds, id])], lastDoughId: nextLast });
+    await store.saveSettings({ ...s, hiddenDoughIds: [...new Set([...s.hiddenDoughIds, id])], ...last });
   } else {
     await store.deleteDough(id);
-    await store.saveSettings({ ...s, lastDoughId: nextLast });
+    await store.saveSettings({ ...s, ...last });
   }
 }
 
@@ -182,11 +207,15 @@ const toRecord = (st: Step): StepRecord => ({ key: st.key, label: st.label, at: 
 export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour): Promise<Batch> {
   if (plan.errors.length) throw new Error(plan.errors.join(' '));
   const i = plan.input;
+  const bread = productOf(i.formula) === 'bread';
+  // Bread is mixed by hand (FWSY p.89); its steps have no mixer version.
+  if (bread) mixer = 'hand';
   const balls = i.balls.filter((b) => b.count > 0);
+  const n = balls.reduce((k, b) => k + b.count, 0);
   const batch: Batch = {
     id: newId('batch'),
     createdAt: new Date().toISOString(),
-    title: `${i.formula.name}, ${balls.reduce((n, b) => n + b.count, 0)} balls`,
+    title: `${i.formula.name}, ${n} ${bread ? (n === 1 ? 'loaf' : 'loaves') : 'balls'}`,
     planned: structuredClone({
       formula: i.formula,
       balls,
@@ -211,7 +240,8 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
   };
   await store.saveBatch(batch);
   const s = await store.getSettings();
-  await store.saveSettings({ ...s, lastDoughId: i.formula.id, lastBalls: balls, roomF: i.roomF, mixer, yeastType: i.yeastType ?? s.yeastType, flour: flour ?? s.flour });
+  const last = bread ? { lastBreadDoughId: i.formula.id, lastLoaves: balls } : { lastDoughId: i.formula.id, lastBalls: balls, mixer };
+  await store.saveSettings({ ...s, ...last, roomF: i.roomF, yeastType: i.yeastType ?? s.yeastType, flour: flour ?? s.flour });
   return batch;
 }
 
@@ -261,7 +291,8 @@ export async function checkStep(batchId: string, key: string, at: Date = new Dat
   const iso = at.toISOString();
   const actual: Actual = { ...b.actual, done: { ...(b.actual.done ?? {}), [key]: iso } };
   if (key === 'mix') actual.mixAt = iso;
-  if (key === 'ball') actual.ballAt = iso;
+  // Bread's "Divide and shape" is its balling time.
+  if (key === 'ball' || key === 'shape') actual.ballAt = iso;
   const next = { ...b, actual };
   await store.saveBatch(next);
   return syncReminders(next);
@@ -276,7 +307,7 @@ export async function uncheckStep(batchId: string, key: string): Promise<Batch> 
   const actual: Actual = { ...b.actual, done };
   // Undo the mirrored "what happened" time too, unless it was edited separately since.
   if (key === 'mix' && actual.mixAt === was) delete actual.mixAt;
-  if (key === 'ball' && actual.ballAt === was) delete actual.ballAt;
+  if ((key === 'ball' || key === 'shape') && actual.ballAt === was) delete actual.ballAt;
   const next = { ...b, actual };
   await store.saveBatch(next);
   return syncReminders(next);

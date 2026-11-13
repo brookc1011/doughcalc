@@ -4,7 +4,7 @@ import {
   cloneDough,
   DEFAULT_EAT_HOUR,
   defaultBalls,
-  doughLibrary,
+  doughLibrary, type Product,
   fmtGrams,
   fmtPct,
   removeDough,
@@ -18,14 +18,14 @@ import {
 import type { Route } from './App';
 import { KitchenMark, NumField } from './common';
 
-export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChange: () => void }) {
+export function DoughsScreen({ product, fromPlan, go, onChange }: { product: Product; fromPlan?: boolean; go: (r: Route) => void; onChange: () => void }) {
   const [lib, setLib] = useState<DoughEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [baseId, setBaseId] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState('');
 
-  const load = () => doughLibrary().then((l) => {
+  const load = () => (product === 'bread' ? doughLibrary(product) : doughLibrary()).then((l) => {
     setLib(l);
     setLoaded(true);
     setBaseId((id) => id || l.find((e) => !e.hidden)?.formula.id || l[0]?.formula.id || '');
@@ -58,16 +58,16 @@ export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChang
     if (!base || !newName.trim()) return;
     const mine = await cloneDough(base, newName.trim());
     setNewName('');
-    go({ name: 'dough', id: mine.id });
+    go({ name: 'dough', id: mine.id, fromPlan });
   };
 
   return (
     <div className="pad dough-library">
-      <button className="link" onClick={() => go({ name: 'settings' })}>
-        ← Settings
+      <button className="link" onClick={() => go({ name: fromPlan ? 'plan' : 'settings' })}>
+        ← {fromPlan ? 'Plan' : 'Settings'}
       </button>
       <p className="eyebrow">Your recipe box</p>
-      <h1>Doughs</h1>
+      <h1>{product === 'bread' ? 'Bread doughs' : 'Pizza doughs'}</h1>
       <p className="intro">Edit what each dough starts with, add your own, or hide the ones you don’t use.</p>
 
       {error && (
@@ -90,7 +90,7 @@ export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChang
               {summary(e.formula)} · {e.formula.source}
             </div>
             <div className="row dough-actions">
-              <button className="small" onClick={() => go({ name: 'dough', id: e.formula.id })}>
+              <button className="small" onClick={() => go({ name: 'dough', id: e.formula.id, fromPlan })}>
                 Edit
               </button>
               <button className="link small" onClick={() => remove(e)}>
@@ -116,7 +116,7 @@ export function DoughsScreen({ go, onChange }: { go: (r: Route) => void; onChang
         </label>
         <label>
           Name
-          <input value={newName} placeholder="e.g. Friday night pies" onChange={(e) => setNewName(e.target.value)} />
+          <input value={newName} placeholder={product === 'bread' ? 'e.g. Sunday loaf' : 'e.g. Friday night pies'} onChange={(e) => setNewName(e.target.value)} />
         </label>
         <button className="primary" disabled={!newName.trim()} onClick={create}>
           Create and edit
@@ -156,7 +156,9 @@ function summary(f: Formula): string {
 
 const pct = (v: number) => +(v * 100).toFixed(2);
 
-export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) => void; onChange: () => void }) {
+export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: Product; fromPlan?: boolean; id: string; go: (r: Route) => void; onChange: () => void }) {
+  const bread = product === 'bread';
+  const [minute, setMinute] = useState(0);
   const [entry, setEntry] = useState<DoughEntry | null>(null);
   const [f, setF] = useState<Formula | null>(null);
   const [balls, setBalls] = useState<BallGroup[]>([]);
@@ -165,11 +167,12 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
   const [saved, setSaved] = useState(false);
 
   const load = async () => {
-    const e = (await doughLibrary()).find((x) => x.formula.id === id) ?? null;
+    const e = (bread ? await doughLibrary(product) : await doughLibrary()).find((x) => x.formula.id === id) ?? null;
     setEntry(e);
     if (!e) return;
     setF(e.formula);
     setBalls(defaultBalls(e.formula));
+    setMinute(e.formula.defaults?.eatMinute ?? 0);
     setEatHour(e.formula.defaults?.eatHour ?? DEFAULT_EAT_HOUR);
     setMixer(e.formula.defaults?.mixer ?? '');
   };
@@ -192,7 +195,7 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
   const save = async () => {
     const next: Formula = {
       ...f,
-      defaults: { balls: balls.filter((b) => b.count > 0), eatHour, mixer: mixer || undefined },
+      defaults: { balls: balls.filter((b) => b.count > 0), eatHour, eatMinute: minute, mixer: mixer || undefined },
     };
     await saveDough(next);
     await load();
@@ -202,7 +205,7 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
 
   return (
     <div className="pad dough-editor">
-      <button className="link" onClick={() => go({ name: 'doughs' })}>
+      <button className="link" onClick={() => go({ name: 'doughs', fromPlan })}>
         ← Doughs
       </button>
       <p className="eyebrow">{entry.kind === 'book' ? (entry.edited ? 'Book dough, edited' : 'Book dough') : 'My dough'}</p>
@@ -213,13 +216,13 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
         <h2>Starting defaults</h2>
         <p className="muted small">Used each time you pick this dough.</p>
         <div className="label">
-          Dough balls <span className="field-hint">count × grams each</span>
+          {bread ? 'Loaves' : 'Dough balls'} <span className="field-hint">count × grams each</span>
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <NumField value={b.count} aria-label={`Ball group ${i + 1}: count`} onValue={(n) => setBall(i, { count: n })} />
+            <NumField value={b.count} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} onValue={(n) => setBall(i, { count: n })} />
             <span>×</span>
-            <NumField value={b.grams} aria-label={`Ball group ${i + 1}: grams each`} onValue={(n) => setBall(i, { grams: n })} />
+            <NumField value={b.grams} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} onValue={(n) => setBall(i, { grams: n })} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -228,27 +231,31 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
             )}
           </div>
         ))}
-        <button className="small" onClick={() => setBalls([...balls, { count: 1, grams: 200, label: 'focaccia' }])}>
+        <button className="small" onClick={() => setBalls([...balls, { count: 1, grams: 200, label: bread ? 'loaf' : 'focaccia' }])}>
           + another size
         </button>
         <label>
           Bake at (time of day)
-          <select value={eatHour} onChange={(e) => { setEatHour(Number(e.target.value)); setSaved(false); }}>
+          {bread ? <input type="time" value={String(eatHour).padStart(2,'0') + ':' + String(minute).padStart(2,'0')} onChange={e => {
+            if (!e.target.value) return;
+            const [h,m] = e.target.value.split(':').map(Number);
+            setEatHour(h); setMinute(m); setSaved(false);
+          }} /> : <select value={eatHour} onChange={(e) => { setEatHour(Number(e.target.value)); setSaved(false); }}>
             {Array.from({ length: 24 }, (_, h) => (
               <option key={h} value={h}>
                 {new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
               </option>
             ))}
-          </select>
+          </select>}
         </label>
-        <label>
+        {!bread && <label>
           Mixing
           <select value={mixer} onChange={(e) => { setMixer(e.target.value as 'hand' | 'mixer' | ''); setSaved(false); }}>
             <option value="">Same as last time</option>
             <option value="hand">By hand</option>
             <option value="mixer">Stand mixer</option>
           </select>
-        </label>
+        </label>}
       </section>
 
       <section className="card">
@@ -277,7 +284,7 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
             <NumField value={pct(f.sugar)} onValue={(n) => patch({ sugar: n / 100 })} />
           </label>
         </div>
-        <div className="row">
+        {!bread && <div className="row">
           <label className="grow">
             Reference ball (g)
             <NumField value={f.ballG} onValue={(n) => patch({ ballG: n })} />
@@ -286,9 +293,9 @@ export function DoughEditor({ id, go, onChange }: { id: string; go: (r: Route) =
             for a pizza of (in)
             <NumField value={f.ballDiameterIn} onValue={(n) => patch({ ballDiameterIn: n })} />
           </label>
-        </div>
+        </div>}
         <p className="muted small">
-          The reference ball sets the thickness used by “Set ball for size” on the Plan screen. Yeast and timing come from:{' '}
+          {!bread && 'The reference ball sets the thickness used by “Set ball for size” on the Plan screen. '}Yeast and timing come from:{' '}
           {f.anchors.map((a) => a.source).join('; ')}.
           {book && ` Book recipe: ${fmtPct(book.hydration)} water, ${fmtPct(book.salt)} salt.`}
         </p>

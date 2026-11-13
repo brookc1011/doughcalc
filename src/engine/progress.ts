@@ -1,7 +1,8 @@
-import { buildSchedule, type Step } from './schedule';
+import { buildBreadSchedule } from './bread/schedule';
+import { buildSchedule, type Schedule, type Step } from './schedule';
 import type { MixMethod } from './methods';
 import type { StepAmounts } from './stepText';
-import type { Formula } from './types';
+import { productOf, type Formula } from './types';
 
 // Re-plans a locked batch from the steps you've checked off.
 // Rule ("protect dinner"): later steps keep the book gaps from what actually happened, the
@@ -34,7 +35,7 @@ export interface Progress {
   steps: ProgressStep[];
   /** Eat time after adjusting; equals the planned one unless it had to move. */
   eatAt: Date;
-  /** Set when dinner had to move later (not enough time after balling). */
+  /** Set when dinner had to move later (not enough time after balling). Bread: set when the bake moved, earlier or later. */
   movedTo?: Date;
   /** First step not yet checked off. */
   nextKey?: string;
@@ -47,6 +48,8 @@ const M = 60_000;
 export function replan(input: ProgressInput, done: Record<string, Date>): Progress {
   const { formula: f, stageH, warmUpH } = input;
   const p = f.process;
+
+  if (productOf(f) === 'bread') return replanBread(input, done);
 
   // Best estimate of the mix time from what's been done so far.
   let mixAt = input.plannedMixAt;
@@ -67,6 +70,36 @@ export function replan(input: ProgressInput, done: Record<string, Date>): Progre
     sch = buildSchedule({ ...base, eatAt });
   }
 
+  return withDone(sch, done, eatAt, movedTo);
+}
+
+/**
+ * Bread: the room proof has no hold (FWSY p.89: "15 minutes can make a difference"), so the loaves go in
+ * when the proof is done. Later steps keep the book gaps from what was checked off, and the bake moves,
+ * earlier or later, with the actual shaping time.
+ */
+function replanBread(input: ProgressInput, done: Record<string, Date>): Progress {
+  const { formula: f, stageH } = input;
+  let mixAt = input.plannedMixAt;
+  if (done.mix) mixAt = done.mix;
+  else if (done.autolyse) mixAt = new Date(done.autolyse.getTime() + f.process.autolyseMin * M);
+  const sch = buildBreadSchedule({
+    formula: f,
+    eatAt: input.eatAt,
+    stageH,
+    mixAt,
+    shapeAt: done.shape,
+    bakeAt: done.bake,
+    lidOffAt: done.lidOff,
+    outAt: done.out,
+    amounts: input.amounts,
+  });
+  const bake = sch.steps.find((s) => s.key === 'bake')!.at;
+  const moved = Math.abs(bake.getTime() - input.eatAt.getTime()) > 1000;
+  return withDone(sch, done, moved ? bake : input.eatAt, moved ? bake : undefined);
+}
+
+function withDone(sch: Schedule, done: Record<string, Date>, eatAt: Date, movedTo: Date | undefined): Progress {
   const steps: ProgressStep[] = sch.steps.map((s) => (done[s.key] ? { ...s, at: done[s.key], doneAt: done[s.key] } : s));
   steps.sort((a, b) => a.at.getTime() - b.at.getTime());
   // Unchecked steps before the latest checked one are behind you (e.g. you skipped ticking the autolyse).

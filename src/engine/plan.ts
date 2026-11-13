@@ -1,9 +1,10 @@
 import { computeRecipe, type Recipe, type YeastType } from './formula';
 import type { MixMethod } from './methods';
 import { getPreset } from './presets';
+import { buildBreadSchedule, mixToBakeH } from './bread/schedule';
 import { buildSchedule, eatWindow, type Schedule } from './schedule';
 import { waterTemps, type TempSettings, type WaterTemp } from './temperature';
-import type { BallGroup, Formula, YeastResult } from './types';
+import { productOf, type BallGroup, type Formula, type YeastResult } from './types';
 import { chooseYeast } from './yeast';
 
 /**
@@ -64,8 +65,14 @@ export interface Plan {
   errors: string[];
 }
 
+/** Timing modes a dough offers. Bread (room proof, no hold) has no slack for "both". */
+export function timingModes(f: Formula): TimingMode[] {
+  return productOf(f) === 'bread' ? ['eat', 'start'] : ['eat', 'start', 'both'];
+}
+
 export function defaultStageH(f: Formula): number {
-  return f.process.stageH ?? getPreset(f.id)?.process.stageH ?? f.anchors[f.anchors.length - 1].hours;
+  // A dough with no yeast anchors (a future levain dough) needs its own stageH; 0 means "not set".
+  return f.process.stageH ?? getPreset(f.id)?.process.stageH ?? f.anchors[f.anchors.length - 1]?.hours ?? 0;
 }
 
 export function planBatch(raw: PlanInput): Plan {
@@ -77,7 +84,14 @@ export function planBatch(raw: PlanInput): Plan {
   let fitNote: string | undefined;
   let fitAnchor: Formula['anchors'][number] | undefined;
 
-  if (timing !== 'eat' && raw.startAt) {
+  const bread = productOf(f) === 'bread';
+  if (bread && timing !== 'eat' && raw.startAt) {
+    // Bread: start at the autolyse; the loaves go in as soon as the proof is done (no hold).
+    const mixAt = new Date(raw.startAt.getTime() + f.process.autolyseMin * 60_000);
+    const bakeAt = new Date(mixAt.getTime() + mixToBakeH(f, stageH) * 3600_000);
+    window = { earliest: bakeAt, latest: bakeAt };
+    input = { ...raw, mixAt, eatAt: timing === 'start' ? bakeAt : raw.eatAt };
+  } else if (timing !== 'eat' && raw.startAt) {
     const start = raw.startAt;
     if (timing === 'both' && raw.stageH === undefined) {
       // Book bulk first. If it doesn't fit, the longest other book anchor that does.
@@ -120,7 +134,10 @@ export function planBatch(raw: PlanInput): Plan {
     yeastType: yeast.basis === 'manual' ? 'instant' : input.yeastType,
   });
   const water = waterTemps(f, input.roomF, input.temp);
-  const schedule = buildSchedule({
+  const amounts = { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour };
+  const schedule = bread
+    ? buildBreadSchedule({ formula: f, eatAt: input.eatAt, stageH, mixAt: input.mixAt, amounts })
+    : buildSchedule({
     formula: f,
     eatAt: input.eatAt,
     stageH,
@@ -128,11 +145,12 @@ export function planBatch(raw: PlanInput): Plan {
     mixAt: input.mixAt,
     mixer: input.mixer,
     preheatMin: input.preheatMin,
-    amounts: { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour },
+    amounts,
   });
 
   const errors = [...recipe.errors, ...schedule.errors];
-  if (input.balls.every((b) => b.count <= 0)) errors.push('Add at least one dough ball.');
+  if (input.balls.every((b) => b.count <= 0)) errors.push(bread ? 'Add at least one loaf.' : 'Add at least one dough ball.');
+  if (bread && timing === 'both') errors.push('Bread proofs at room temperature with no hold, so pick a start time or a bake time, not both.');
   if (yeast.basis === 'manual' && yeast.pct <= 0) errors.push(yeast.warning ?? 'Enter a yeast amount.');
 
   return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors };

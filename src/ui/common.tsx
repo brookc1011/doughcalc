@@ -58,6 +58,18 @@ export function NumField({ value, onValue, onFocus, onBlur, ...rest }: NumFieldP
 type Recipe = Plan['recipe'];
 type Yeast = Plan['yeast'];
 type Water = Plan['water'];
+/** Keep edition-specific timing and any extra notes supplied by the engine. */
+export function StepDetail({ stepKey, detail }: { stepKey: string; detail: string }) {
+  if (stepKey !== 'proofCheck') return <>{detail}</>;
+  const cues = "Poke a loaf about ½ inch deep. Springs back at once: give it more time. Springs back slowly and not all the way: ready to bake. Doesn't spring back: overproofed.";
+  if (!detail.includes(cues)) return <>{detail}</>;
+  return <>
+    <strong>Poke a loaf about ½ inch deep. If the dent springs back slowly and partly stays, it’s ready to bake.</strong>
+    <div>If it springs back at once, give it more time. If it stays unchanged, the loaf is overproofed.</div>
+    <div className="proof-timing">{detail.replace(cues, '').trim()}</div>
+  </>;
+}
+
 type StepLike = { key: string; label: string; at: Date | string; detail: string };
 
 export function RecipeView({ recipe, yeast, water, unit }: { recipe: Recipe; yeast: Yeast; water: Water; unit: 'F' | 'C' }) {
@@ -117,7 +129,7 @@ export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: st
               </a>
             </div>
             <div className="step-time">{fmtWhen(s.at)}</div>
-            <div className="muted small">{s.detail}</div>
+            <div className="muted small"><StepDetail stepKey={s.key} detail={s.detail} /></div>
             {gapToNext(steps, i) && <div className="small step-gap">{gapToNext(steps, i)}</div>}
           </li>
         ))}

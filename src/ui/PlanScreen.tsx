@@ -2,7 +2,7 @@ import { defaultStart, READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation'
 import { FLOUR_SOURCES, HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  allDoughs,
+  allDoughs, lastDoughId, timingModes, type Product,
   ballForDiameter,
   cloneDough,
   DEFAULT_EAT_HOUR,
@@ -26,10 +26,10 @@ import {
 import type { Route } from './App';
 import { Chips, cToF, download, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
-function tomorrowAt(hour: number): Date {
+function tomorrowAt(hour: number, minute = 0): Date {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(hour, minute, 0, 0);
   return d;
 }
 
@@ -46,18 +46,20 @@ const TIMING_INTRO: Record<TimingMode, string> = {
   both: 'Pick your dough. We’ll fit it between start and bake.',
 };
 
-export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract<Route, { name: 'plan' }>['repeat']; settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
+export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repeat }: { product: Product; chooseProduct: (p: Product) => void; repeat?: Extract<Route, { name: 'plan' }>['repeat']; settings: Settings; go: (r: Route) => void; onSaved: () => void }) {
+  const bread = product === 'bread';
+  const loadDoughs = () => bread ? allDoughs(product) : allDoughs();
   const unit = settings.unit;
   const [doughs, setDoughs] = useState<Formula[]>([]);
   const [doughId, setDoughId] = useState(repeat?.formula.id ?? settings.lastDoughId);
   const [balls, setBalls] = useState<BallGroup[]>(repeat?.balls ?? settings.lastBalls);
-  const [eatAt, setEatAt] = useState(toLocalInput(tomorrowAt(18)));
+  const [eatAt, setEatAt] = useState(toLocalInput(tomorrowAt(repeat?.formula.defaults?.eatHour ?? (bread ? 9 : 18), repeat?.formula.defaults?.eatMinute ?? (bread ? 15 : 0))));
   const [timing, setTiming] = useState<TimingMode>('eat');
   const [startAt, setStartAt] = useState(toLocalInput(defaultStart()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
   // Blank by default every time: a winter setback shouldn't carry into a summer bake.
   const [rise, setRise] = useState('');
-  const [mixer, setMixer] = useState<'hand' | 'mixer'>(repeat?.mixer ?? settings.mixer);
+  const [mixer, setMixer] = useState<'hand' | 'mixer'>(bread ? 'hand' : repeat?.mixer ?? settings.mixer);
   const [yeastType, setYeastType] = useState<YeastType>(repeat ? repeat.yeastType ?? 'instant' : settings.yeastType ?? 'instant');
   const [flour, setFlour] = useState<Flour | ''>(repeat ? repeat.flour ?? '' : settings.flour ?? '');
   const [useSnapshot, setUseSnapshot] = useState(!!repeat);
@@ -73,17 +75,23 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
     setDoughId(f.id);
     setBalls(defaultBalls(f));
     // In Start or Both mode the times you typed stay put when you switch dough.
-    if (timing === 'eat') setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR)));
-    setMixer(f.defaults?.mixer ?? settings.mixer);
+    if (timing === 'eat') setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR, f.defaults?.eatMinute ?? 0)));
+    setMixer(bread ? 'hand' : f.defaults?.mixer ?? settings.mixer);
     setDefaultsSaved(false);
   };
 
   useEffect(() => {
-    allDoughs().then((list) => {
+    let active = true;
+    Promise.all([loadDoughs(), lastDoughId(product)]).then(([list, last]) => {
+      if (!active) return;
       setDoughs(list);
-      const start = list.find((d) => d.id === settings.lastDoughId) ?? list[0];
-      if (start && !repeat) applyDefaults(start);
+      const start = list.find((d) => d.id === last) ?? list[0];
+      if (start && !repeat) {
+        applyDefaults(start);
+        if (bread && settings.lastLoaves?.length && last === start.id) setBalls(settings.lastLoaves);
+      }
     });
+    return () => { active = false; };
   }, []);
 
   // Any change after saving re-enables "Always start this dough this way".
@@ -142,11 +150,12 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
   const saveDefaults = async () => {
     const base = savedFormula;
     if (!base) return;
-    await saveDough({
+    if (bread) await saveDough({ ...base, defaults: { balls: balls.filter(b => b.count > 0), eatHour: new Date(eatAt).getHours(), eatMinute: new Date(eatAt).getMinutes(), mixer } });
+    else await saveDough({
       ...base,
       defaults: { balls: balls.filter((b) => b.count > 0), eatHour: new Date(eatAt).getHours(), mixer },
     });
-    setDoughs(await allDoughs());
+    setDoughs(bread ? await allDoughs(product) : await allDoughs());
     setDefaultsSaved(true);
   };
 
@@ -154,7 +163,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
     const name = prompt('Name for this dough', `My ${formula.name}`);
     if (!name) return;
     const mine = await cloneDough(formula, name);
-    setDoughs(await allDoughs());
+    setDoughs(bread ? await allDoughs(product) : await allDoughs());
     setUseSnapshot(false);
     setDoughId(mine.id);
     setEdits({});
@@ -177,14 +186,15 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
 
   return (
     <div className="pad">
-      <p className="eyebrow">A little planning. Great pizza.</p>
+      <p className="eyebrow">{bread ? "Your bread kitchen" : "A little planning. Great pizza."}</p>
       <h1>Plan a bake</h1>
-      <p className="intro">{useSnapshot ? 'Choose a new time for this dough.' : TIMING_INTRO[timing]}</p>
+      <Chips value={product} options={[{ v: 'pizza', label: 'Pizza' }, { v: 'bread', label: 'Bread' }]} onChange={chooseProduct} />
+      <p className="intro">{useSnapshot ? 'Choose a new time for this dough.' : bread ? 'Choose your loaves and when to bake.' : TIMING_INTRO[timing]}</p>
 
       <section className="card plan-inputs">
         <div className="row between field-heading">
             <label htmlFor="plan-dough">Dough</label>
-            <button type="button" className="link small" onClick={() => go({ name: 'doughs' })}>
+            <button type="button" className="link small" onClick={() => go({ name: 'doughs', fromPlan: true })}>
               Manage doughs
             </button>
         </div>
@@ -198,14 +208,14 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
           </select>
 
         <div className="label">
-          Dough balls <span className="field-hint">count × grams each</span>
-          <Info label="dough balls">{HELP_COPY["dough balls"]}</Info>
+          {bread ? 'Loaves' : 'Dough balls'} <span className="field-hint">count × grams each</span>
+          {!bread && <Info label="dough balls">{HELP_COPY["dough balls"]}</Info>}
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label={`Ball group ${i + 1}: count`} />
+            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} />
             <span>×</span>
-            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`Ball group ${i + 1}: grams each`} />
+            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -218,9 +228,9 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
           <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved || !savedFormula}>
             {defaultsSaved ? 'Saved' : 'Save defaults'}
           </button>
-          <Info label="saved defaults">{HELP_COPY["saved defaults"]}</Info>
+          <Info label="saved defaults">{bread ? 'Saves loaf sizes and bake time for this dough.' : HELP_COPY['saved defaults']}</Info>
         </div>
-        <details className="size-options"><summary>Sizes & diameter</summary>
+        {!bread && <details className="size-options"><summary>Sizes & diameter</summary>
         <p className="muted small">
           “Set ball for size” changes the first line’s grams so a bigger or smaller pizza keeps the same thickness as{' '}
           {formula.ballG} g on {formula.ballDiameterIn}".
@@ -232,14 +242,14 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
           <SizeHelper formula={formula} onPick={(g) => setBall(0, { grams: Math.round(g) })} />
         </div>
 
-        </details>
+        </details>}
         <fieldset className="timing-group">
         <legend className="sr-only">Plan around</legend>
         <div className="timing-help">
           <span>Plan around</span>
-          <Info label="planning times">{HELP_COPY["planning times"]}</Info>
+          <Info label="planning times">{bread ? 'Bake at is when the loaves go in the oven. Start at works forward from the first step.' : HELP_COPY['planning times']}</Info>
         </div>
-        <Chips value={timing} options={TIMING_OPTIONS} onChange={setTiming} />
+        <Chips value={timing} options={TIMING_OPTIONS.filter(o => timingModes(formula).includes(o.v))} onChange={setTiming} />
         <p className="timing-hint">{TIMING_HINTS[timing]}</p>
         {timing !== 'eat' && (
           <label>
@@ -249,10 +259,13 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
         )}
         {timing !== 'start' && (
           <label>
-            First pizza in the oven at
+            {bread ? 'Bake at' : 'First pizza in the oven at'}
             <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
           </label>
         )}
+        {bread && plan.schedule.steps.some(s => s.key === 'slice') && <dl className="bread-times">
+          {plan.schedule.steps.filter(s => s.key === 'bake' || s.key === 'slice').map(s => <div key={s.key}><dt>{s.key === 'bake' ? 'Into the oven' : 'Ready to slice'}</dt><dd>{fmtWhen(s.at)}</dd></div>)}
+        </dl>}
         {plan.window && (
           <div className="ready-window">
             <p className="eyebrow">Ready window</p>
@@ -297,16 +310,16 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
           </p>
         )}
         <fieldset className="bake-setup">
-          <legend>Mixing &amp; ingredients</legend>
+          <legend>{bread ? 'Ingredients' : 'Mixing & ingredients'}</legend>
           <div className="setup-fields">
-            <div className="setup-row">
+            {!bread && <div className="setup-row">
               <label htmlFor="plan-mixing">Mixing</label>
               <Info label="mixing method">{HELP_COPY["mixing method"]}</Info>
               <select id="plan-mixing" value={mixer} onChange={(e) => setMixer(e.target.value as 'hand' | 'mixer')}>
                 <option value="hand">By hand</option>
                 <option value="mixer">Stand mixer</option>
               </select>
-            </div>
+            </div>}
             <div className="setup-row">
               <label htmlFor="plan-yeast">Yeast</label>
               <Info label="yeast type">{HELP_COPY["yeast type"]}</Info>
@@ -317,7 +330,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
             </div>
             <div className="setup-row">
               <label htmlFor="plan-flour">Flour</label>
-              <Info label="flour" links={FLOUR_SOURCES}>{HELP_COPY["flour"]}</Info>
+              <Info label="flour" links={bread ? undefined : FLOUR_SOURCES}>{bread ? 'Recorded with this bake for your flour history.' : HELP_COPY['flour']}</Info>
               <select id="plan-flour" value={flour} onChange={(e) => setFlour(e.target.value as Flour | '')}>
                 <option value="">Not set</option>
                 {(Object.keys(FLOUR_LABELS) as Flour[]).map((k) => (
@@ -361,7 +374,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
               <Info label="ferment time">
                 {formula.family === 'poolish'
                   ? 'How long the poolish sits out before the final mix.'
-                  : 'Time from mixing to dividing into balls.'}{' '}
+                  : bread ? 'Time from mixing to shaping the loaves.' : 'Time from mixing to dividing into balls.'}{' '}
                 The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.
               </Info>
             </span>

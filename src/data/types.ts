@@ -24,6 +24,9 @@ export interface Settings {
   kitchenFactor: number;
   lastDoughId: string;
   lastBalls: BallGroup[];
+  /** Bread: the last bread dough and loaves locked in. Missing until the first bread batch. */
+  lastBreadDoughId?: string;
+  lastLoaves?: BallGroup[];
   ovens: Oven[];
   lastOvenId: string;
   /** Doughs removed from the picker. Book doughs are only hidden, so they can be restored. */

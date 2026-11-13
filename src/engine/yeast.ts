@@ -66,6 +66,11 @@ export function chooseYeast(formula: Formula, stage: YeastStage, opts: YeastOpti
     };
   }
 
+  // No book dose to scale from: the baker enters the yeast (never a made-up figure).
+  if (formula.anchors.length === 0) {
+    return { pct: 0, basis: 'manual', note: 'This dough has no book yeast amount.', warning: 'Enter the yeast amount yourself.' };
+  }
+
   // Scale from the anchor closest in equivalent fermentation, measured on a log scale.
   const eq = equivalentHours(stage.hours, stage.tempF);
   let best: YeastAnchor = formula.anchors[0];

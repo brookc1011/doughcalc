@@ -8,6 +8,10 @@ export type Rim = 'flat' | 'good' | 'puffy';
 export type Bottom = 'pale' | 'good' | 'burnt';
 export type Center = 'gummy' | 'set';
 export type Ready = 'early' | 'onTime' | 'late';
+// Bread ("Add bread details").
+export type Crust = 'pale' | 'good' | 'dark';
+export type Loaf = 'flat' | 'good' | 'tight';
+export type Crumb = 'gummy' | 'good';
 
 export interface Survey {
   stretch?: Stretch;
@@ -17,6 +21,9 @@ export interface Survey {
   ready?: Ready;
   overall?: 1 | 2 | 3 | 4 | 5;
   makeAgain?: boolean;
+  crust?: Crust;
+  loaf?: Loaf;
+  crumb?: Crumb;
 }
 
 export type Area = 'timing' | 'oven' | 'handling' | 'shaping';
@@ -29,6 +36,8 @@ export interface Suggestion {
 
 const KA_REST = 'King Arthur, How to Stretch Pizza Dough';
 const PB_WARM = 'PizzaBlab, How to Cold Ferment Pizza Dough';
+const FWSY_BAKE = 'FWSY p.89: bake until at least medium dark brown, check after 15 minutes uncovered, rest at least 20 minutes';
+const FWSY_DENT = 'FWSY p.74: the finger-dent test';
 
 /** All suggestions in priority order. The first one is "the one change" for next time. */
 export function suggestions(s: Survey): Suggestion[] {
@@ -46,6 +55,14 @@ export function suggestions(s: Survey): Suggestion[] {
     out.push({ area: 'oven', text: 'Pale bottom. Next time: preheat the stone or steel longer, or move it closer to the heat.' });
   } else if (s.bottom === 'burnt') {
     out.push({ area: 'oven', text: 'Bottom burnt before the top was done. Next time: less heat from below or more from above (rack higher, or use the broiler).' });
+  }
+  if (s.crust === 'pale') {
+    out.push({ area: 'oven', text: 'Pale crust. Next time: leave the lid off longer, until the loaf is at least medium dark brown all around.', source: FWSY_BAKE });
+  } else if (s.crust === 'dark') {
+    out.push({ area: 'oven', text: 'Crust too dark. Next time: check the loaf 15 minutes after the lid comes off; your oven may run hot.', source: FWSY_BAKE });
+  }
+  if (s.crumb === 'gummy') {
+    out.push({ area: 'oven', text: 'Gummy crumb. Next time: bake to at least medium dark brown and rest the loaf at least 20 minutes before slicing.', source: FWSY_BAKE });
   }
   if (s.center === 'gummy') {
     out.push({ area: 'oven', text: 'Gummy center. Next time: lighter, drier toppings or a longer bake. Check the oven before changing the dough.' });
@@ -79,6 +96,13 @@ export function suggestions(s: Survey): Suggestion[] {
     );
   } else if (s.rim === 'puffy') {
     out.push({ area: 'shaping', text: 'Rim too puffy. Next time: press the edge a little more, or use a slightly smaller ball.' });
+  }
+
+  // 5. Bread proof.
+  if (s.loaf === 'flat') {
+    out.push({ area: 'shaping', text: 'Loaf spread flat: likely overproofed. Next time: do the finger-dent test at 1 hour and bake as soon as the dent springs back slowly.', source: FWSY_DENT });
+  } else if (s.loaf === 'tight') {
+    out.push({ area: 'shaping', text: 'Loaf tight or burst open: likely underproofed. Next time: if the dent springs right back, give it more time.', source: FWSY_DENT });
   }
 
   return out;

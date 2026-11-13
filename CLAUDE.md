@@ -31,8 +31,8 @@ Personal pizza dough calculator and bake log for CJ (not LoanStar work). Install
 - Locked batches are immutable plans plus an editable "actual" layer. Any schema change gets a new `if (oldVersion < N)` migration in `src/data/store.ts`; never edit an old one. Bake data lives only on the phone, so a broken migration loses history.
 
 ## ChatGPT UI hand-offs
-- Build a fresh zip from the current `src/ui/`, `HANDOFF.md`, read-only copies of `src/api.ts`, `src/engine/types.ts`, `src/data/types.ts`, `package.json`, and phone screenshots. Put it in `handoff/` (git-ignored).
-- On return: unzip into `handoff/incoming/`. Before copying, check that the imports are only `react`, `../api` and `./`. Check for no network calls and no new packages. Then read the changed files and copy only `src/ui/`. Then run the full check list above. Do not run any scripts ChatGPT includes.
+- Build a fresh zip from the current `src/ui/`, `HANDOFF.md`, read-only copies of `src/api.ts`, `src/engine/types.ts`, `src/data/types.ts`, `package.json`, and phone screenshots. Put it with its prompt in `handoff/current/` (git-ignored; `handoff/README.md` explains the layout). Move each finished round to `handoff/archive/<date>-<round>/`, dropping its `node_modules` and `dist` copies.
+- On return: unzip into a new empty folder. Before copying, check that the imports are only `react`, `../api` and `./`. Check for no network calls and no new packages. Then read the changed files and copy only `src/ui/`. Then run the full check list above. Do not run any scripts ChatGPT includes.
 
 ## Parked ideas
 Sourdough phase 2 (starter log, levain build calculator), flour blends, compare view, friction calibration from measured dough temperature, cloud sync.

@@ -3,6 +3,13 @@
 
 export type DoughFamily = 'straight' | 'poolish';
 
+/** What the dough becomes. Missing on a formula means pizza (every dough saved before bread). */
+export type Product = 'pizza' | 'bread';
+
+export function productOf(f: { product?: Product }): Product {
+  return f.product ?? 'pizza';
+}
+
 /** A proven schedule point: the yeast dose a source uses for a given ferment. */
 export interface YeastAnchor {
   label: string;
@@ -35,6 +42,8 @@ export interface TeaspoonNote {
 export interface Formula {
   id: string;
   name: string;
+  /** Missing: pizza. Locked batches copy the whole formula, so old batches read as pizza with no migration. */
+  product?: Product;
   family: DoughFamily;
   source: string;
   hydration: number;
@@ -44,7 +53,7 @@ export interface Formula {
   /** Default yeast stage anchors. The engine picks the nearest one. */
   anchors: YeastAnchor[];
   preferment?: Preferment;
-  /** Default ball weight (g) and the diameter (in) it is meant for. */
+  /** Default ball weight (g) and the diameter (in) it is meant for. Bread: loaf dough weight; diameter unused (0). */
   ballG: number;
   ballDiameterIn: number;
   /** Bowl/tool loss as a fraction of usable dough. 0 for presets that already carry surplus. */
@@ -67,6 +76,8 @@ export interface Formula {
     proofInFridge: boolean;
     /** Longest the balls keep after balling (fridge), hours. */
     maxHoldH: number;
+    /** Bread only: how many folds the recipe calls for. */
+    folds?: number;
   };
   /** Known gram-to-teaspoon equivalents printed in the source. */
   teaspoons: TeaspoonNote[];
@@ -78,15 +89,17 @@ export interface Formula {
 
 export interface DoughDefaults {
   balls: BallGroup[];
-  /** Hour of day (0-23) for the default "eat at" time. */
+  /** Hour of day (0-23) for the default "eat at" time (bread: when the loaves go in). */
   eatHour?: number;
+  /** Minutes past eatHour (bread: the book's sample bake is 9:15 a.m.). Missing: on the hour. */
+  eatMinute?: number;
   mixer?: 'hand' | 'mixer';
 }
 
 export interface BallGroup {
   count: number;
   grams: number;
-  /** Optional label, e.g. "pizza" or "focaccia". */
+  /** Optional label, e.g. "pizza", "focaccia" or "loaf". Bread uses the same shape: count loaves of grams dough. */
   label?: string;
 }
 

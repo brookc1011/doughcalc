@@ -104,7 +104,7 @@ General FWSY notes for both pizza and bread are in `docs/sources/fwsy-general.md
 4. **UI hand-off to ChatGPT.** Switch, bread plan, checklist and rate screens, starter screens, Bakes filter. Imported through the usual checks.
 5. **Polish.** More bread presets, iPhone Safari checklist pass, a real bake on the phone.
 
-Deferred: flatbreads/naan, starter charts, a permanent Starter tab.
+Deferred: flatbreads/naan, starter charts, a permanent Starter tab, and one-Dutch-oven timing (a second oven session, the pot reheat, and a separate ready-to-slice time for each loaf; ChatGPT's bread round, 2026-11-13). The Preheat step text covers one pot in words until then.
 
 ## Verification (per phase)
 - `npm run guard`, `npm test` and `npm run build` all pass. Guard update in phases 1-3.

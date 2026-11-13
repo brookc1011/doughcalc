@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getSettings, requestPersistence, retryReminders, type Batch, type Settings } from '../api';
+import { productOf, type Product, getSettings, requestPersistence, retryReminders, type Batch, type Settings } from '../api';
 import { BatchScreen } from './BatchScreen';
 import { DoughEditor, DoughsScreen } from './DoughsScreen';
 import { HistoryScreen } from './HistoryScreen';
@@ -13,8 +13,8 @@ export type Route =
   | { name: 'history' }
   | { name: 'settings' }
   | { name: 'batch'; id: string }
-  | { name: 'doughs' }
-  | { name: 'dough'; id: string };
+  | { name: 'doughs'; fromPlan?: boolean }
+  | { name: 'dough'; id: string; fromPlan?: boolean };
 
 const same = (a?: Route, b?: Route) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
 
@@ -26,6 +26,13 @@ function fieldAndBarButton(target: EventTarget | null): HTMLElement | undefined 
 }
 
 export function App() {
+  const [product, setProduct] = useState<Product>(() => {
+    try { return localStorage.getItem('plan-product') === 'bread' ? 'bread' : 'pizza'; }
+    catch { return 'pizza'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('plan-product', product); } catch { /* Use the session preference. */ }
+  }, [product]);
   const [route, setRoute] = useState<Route>({ name: 'plan' });
   const [settings, setSettings] = useState<Settings | null>(null);
   // Screens visited, mirrored in the browser history so Android's back swipe steps back through them.
@@ -40,7 +47,9 @@ export function App() {
     const onPop = (e: PopStateEvent) => {
       const i = typeof e.state?.idx === 'number' ? e.state.idx : 0;
       idx.current = i;
-      setRoute(stack.current[i] ?? { name: 'plan' });
+      const dest = stack.current[i] ?? { name: 'plan' };
+      if (dest.name === 'plan' && dest.repeat) setProduct(productOf(dest.repeat.formula));
+      setRoute(dest);
     };
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);
@@ -48,6 +57,7 @@ export function App() {
 
   /** Open a screen. Going to the screen you just came from counts as going back. */
   const go = (r: Route) => {
+    if (r.name === 'plan' && r.repeat) setProduct(productOf(r.repeat.formula));
     if (same(r, stack.current[idx.current])) return;
     if (same(r, stack.current[idx.current - 1])) {
       history.back();
@@ -103,11 +113,15 @@ export function App() {
       onClickCapture={(event) => fieldAndBarButton(event.target)?.blur()}
     >
       <main>
-        {route.name === 'plan' && <PlanScreen key={route.fromBatch} repeat={route.repeat} settings={settings} go={go} onSaved={reloadSettings} />}
+        {route.name === 'plan' && <PlanScreen key={product + (route.fromBatch ?? '')} product={product} chooseProduct={(next) => {
+          if (next === product) return;
+          if (route.repeat) go({ name: 'plan' });
+          setProduct(next);
+        }} repeat={route.repeat && productOf(route.repeat.formula) === product ? route.repeat : undefined} settings={settings} go={go} onSaved={reloadSettings} />}
         {route.name === 'history' && <HistoryScreen settings={settings} go={go} />}
         {route.name === 'settings' && <SettingsScreen settings={settings} onChange={reloadSettings} go={go} />}
-        {route.name === 'doughs' && <DoughsScreen go={go} onChange={reloadSettings} />}
-        {route.name === 'dough' && <DoughEditor key={route.id} id={route.id} go={go} onChange={reloadSettings} />}
+        {route.name === 'doughs' && <DoughsScreen product={product} fromPlan={route.fromPlan} go={go} onChange={reloadSettings} />}
+        {route.name === 'dough' && <DoughEditor fromPlan={route.fromPlan} product={product} key={route.id} id={route.id} go={go} onChange={reloadSettings} />}
         {route.name === 'batch' && (
           <BatchScreen id={route.id} settings={settings} go={go} onSaved={reloadSettings} />
         )}

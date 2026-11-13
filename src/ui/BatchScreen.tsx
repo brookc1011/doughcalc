@@ -2,7 +2,7 @@ import { BATCH_TARGETS, HOME_SCREEN_HELP, reminderStatus, stepPresentation, step
 import { HELP_COPY } from './helpCopy';
 import { useEffect, useState } from 'react';
 import {
-  addSession,
+  productOf, addSession,
   batchIcs,
   batchProgress,
   checkStep,
@@ -32,7 +32,7 @@ import {
   type Survey,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, Info, jumpTo, KitchenMark, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
+import { StepDetail, Chips, cToF, download, fToC, Info, jumpTo, KitchenMark, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
 
 export function BatchScreen({
   id,
@@ -58,6 +58,7 @@ export function BatchScreen({
 
   if (!batch) return <p className="pad">Loading…</p>;
   const p = batch.planned;
+  const bread = productOf(p.formula) === 'bread';
   const unit = settings.unit;
 
   const remove = async () => {
@@ -112,7 +113,7 @@ export function BatchScreen({
 
       <section id={BATCH_TARGETS.rating} tabIndex={-1} aria-label="Bake feedback">
       {rating ? (
-        <RateForm
+        <RateForm bread={bread}
           settings={settings}
           onCancel={() => setRating(false)}
           onSave={async (form) => {
@@ -136,7 +137,7 @@ export function BatchScreen({
       {batch.sessions.length > 0 && (
         <details className="card"><summary>Bakes from this batch ({batch.sessions.length})</summary>
           {batch.sessions.map((s) => (
-            <SessionRow key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
+            <SessionRow bread={bread} key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
           ))}
         </details>
       )}
@@ -315,7 +316,9 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
 
       {prog.movedTo && (
         <p className="warn" role="status">
-          Running behind: the balls need their full rest, so the bake moves to {fmtWhen(prog.movedTo)}.
+          {productOf(batch.planned.formula) === 'bread'
+            ? `Bake time moved ${prog.movedTo.getTime() < Date.parse(batch.planned.eatAt) ? 'earlier' : 'later'} to ${fmtWhen(prog.movedTo)}.`
+            : `Running behind: the balls need their full rest, so the bake moves to ${fmtWhen(prog.movedTo)}.`}
         </p>
       )}
 
@@ -377,7 +380,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   </div>
                 </div>
               )}
-              {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail}</div>}
+              {!s.doneAt && !s.passed && <div className="muted small step-detail"><StepDetail stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>}
               {!s.doneAt && !s.passed && s.cover && (
                 <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'Lid off while shaping'}</div>
               )}
@@ -405,13 +408,13 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
   );
 }
 
-function SessionRow({ session, ovenName }: { session: Batch['sessions'][number]; ovenName: string }) {
+function SessionRow({ session, ovenName, bread }: { bread: boolean; session: Batch['sessions'][number]; ovenName: string }) {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
     if (session.photoId) photoUrl(session.photoId).then(setUrl);
   }, [session.photoId]);
   const s = session.survey;
-  const flags = [s.ready, s.stretch, s.rim, s.bottom, s.center].filter((x) => x && x !== 'good' && x !== 'onTime' && x !== 'set');
+  const flags = [s.ready, s.stretch, s.rim, s.bottom, s.center, s.crust, s.loaf, s.crumb].filter((x) => x && x !== 'good' && x !== 'onTime' && x !== 'set');
   const tips = suggestions(s);
   return (
     <div className="session">
@@ -420,7 +423,7 @@ function SessionRow({ session, ovenName }: { session: Batch['sessions'][number];
         <span>{s.overall ? `${s.overall}/5` : ''}</span>
       </div>
       <div className="muted small">
-        {session.balls} balls · {ovenName}
+        {session.balls} {bread ? session.balls === 1 ? 'loaf' : 'loaves' : 'balls'} · {ovenName}
         {s.makeAgain !== undefined ? ` · make again: ${s.makeAgain ? 'yes' : 'no'}` : ''}
       </div>
       {flags.length > 0 && <div className="small">Flags: {flags.join(', ')}</div>}
@@ -434,11 +437,12 @@ function SessionRow({ session, ovenName }: { session: Batch['sessions'][number];
 type RateFormValue = Parameters<typeof addSession>[1];
 
 function RateForm({
-  settings,
+  bread, settings,
   onSave,
   onCancel,
 }: {
   settings: Settings;
+  bread: boolean;
   onSave: (f: RateFormValue) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -456,9 +460,9 @@ function RateForm({
     <section className="card rating-card" aria-label="Rate this bake">
       <p className="eyebrow">A quick bake check-in</p>
       <h2>How did it go?</h2>
-      <div className="rating-tabs" aria-label="Rating sections">{['Dough', 'Bake', 'Verdict'].map((label, i) => <button key={label} aria-current={step === i ? 'step' : undefined} className={step === i ? 'on' : ''} onClick={() => setStep(i)}>{i + 1}. {label}</button>)}</div>
+      <div hidden={bread} className="rating-tabs" aria-label="Rating sections">{['Dough', 'Bake', 'Verdict'].map((label, i) => <button key={label} aria-current={step === i ? 'step' : undefined} className={step === i ? 'on' : ''} onClick={() => setStep(i)}>{i + 1}. {label}</button>)}</div>
       <p className="muted small">Tap what fits. Skip anything you’re unsure of.</p>
-      <div hidden={step !== 0}>
+      <div hidden={bread || step !== 0}>
       <div className="label">Dough was ready</div>
       <Chips
         value={survey.ready}
@@ -479,7 +483,7 @@ function RateForm({
           { v: 'snapped', label: 'Snapped back' },
         ]}
       />
-      </div><div hidden={step !== 1}>
+      </div><div hidden={bread || step !== 1}>
       <div className="label">Rim</div>
       <Chips
         value={survey.rim}
@@ -509,13 +513,31 @@ function RateForm({
           { v: 'set', label: 'Cooked through' },
         ]}
       />
-      </div><div hidden={step !== 2}>
+      </div><div hidden={!bread && step !== 2}>
       <div className="label">Overall <span className="field-hint">1 = rough · 5 = loved it</span></div>
       <Chips
         value={survey.overall ? String(survey.overall) : undefined}
         onChange={(v) => set({ overall: Number(v) as Survey['overall'] })}
         options={['1', '2', '3', '4', '5'].map((n) => ({ v: n, label: n }))}
       />
+      {bread && <details className="optional-notes"><summary>Add bread details</summary>
+      <div className="label">Dough was ready</div>
+      <Chips
+        value={survey.ready}
+        onChange={(v) => set({ ready: v })}
+        options={[
+          { v: 'early', label: 'Early' },
+          { v: 'onTime', label: 'On time' },
+          { v: 'late', label: 'Late' },
+        ]}
+      />
+        <div className="label">Crust</div>
+        <Chips value={survey.crust} onChange={v => set({ crust: v })} options={[{ v: 'pale', label: 'Pale' }, { v: 'good', label: 'Good' }, { v: 'dark', label: 'Dark' }]} />
+        <div className="label">Loaf shape</div>
+        <Chips value={survey.loaf} onChange={v => set({ loaf: v })} options={[{ v: 'flat', label: 'Flat' }, { v: 'good', label: 'Good' }, { v: 'tight', label: 'Tight' }]} />
+        <div className="label">Crumb</div>
+        <Chips value={survey.crumb} onChange={v => set({ crumb: v })} options={[{ v: 'gummy', label: 'Gummy' }, { v: 'good', label: 'Good' }]} />
+      </details>}
       <div className="label">Make it again?</div>
       <Chips
         value={survey.makeAgain === undefined ? undefined : survey.makeAgain ? 'yes' : 'no'}
@@ -537,7 +559,7 @@ function RateForm({
           </select>
         </label>
         <label>
-          Balls baked
+          {bread ? 'Loaves baked' : 'Balls baked'}
           <NumField value={balls} onValue={setBalls} style={{ width: '5em' }} />
         </label>
       </div>
@@ -554,9 +576,9 @@ function RateForm({
       {error && <p className="warn" role="alert">{error}</p>}
       <div className="rating-actions">
         {step > 0 && <button onClick={() => setStep(step - 1)}>Back</button>}
-        {step < 2 && <button className="primary" onClick={() => setStep(step + 1)}>Next →</button>}
+        {!bread && step < 2 && <button className="primary" onClick={() => setStep(step + 1)}>Next →</button>}
         <button
-          className={step === 2 ? "primary" : "link"}
+          className={bread || step === 2 ? "primary" : "link"}
           disabled={busy}
           onClick={async () => {
             setBusy(true);
@@ -605,7 +627,7 @@ function ActualForm({ batch, unit, onSave }: { batch: Batch; unit: 'F' | 'C'; on
         <input type="datetime-local" value={mixAt} onChange={(e) => setMixAt(e.target.value)} />
       </label>
       <label>
-        Balled at
+        {productOf(batch.planned.formula) === 'bread' ? 'Shaped at' : 'Balled at'}
         <input type="datetime-local" value={ballAt} onChange={(e) => setBallAt(e.target.value)} />
       </label>
       <div className="row">

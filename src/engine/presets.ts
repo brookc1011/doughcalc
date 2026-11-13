@@ -1,3 +1,4 @@
+import { BREAD_PRESETS } from './bread/presets';
 import type { BallGroup, Formula, YeastAnchor } from './types';
 
 // Source key used throughout: FWSY = Ken Forkish, "Flour Water Salt Yeast", page numbers from CJ's copy.
@@ -103,6 +104,8 @@ export const PRESETS: Formula[] = [
       { grams: 20, text: '1 tbsp + 3/4 tsp', source: 'FWSY p.226' },
     ],
   },
+  // Bread presets live in their own file; the library filters by product.
+  ...BREAD_PRESETS,
 ];
 
 export function getPreset(id: string): Formula | undefined {

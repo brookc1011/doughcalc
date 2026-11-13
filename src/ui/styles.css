@@ -918,3 +918,10 @@ input, select, textarea {
 .bulk-room input { max-width: 10rem; display: block; }
 .bulk-room .step-actions { margin-bottom: 0; }
 ol.checklist-steps li.done:has(.bulk-room) { opacity: 1; }
+
+.bread-times { display: grid; grid-template-columns: repeat(auto-fit,minmax(8rem,1fr)); gap: 12px; background: var(--soft); border-radius: 10px; padding: 12px; }
+.bread-times dt { color: var(--muted); font-size: .85rem; }
+.bread-times dd { margin: 3px 0 0; font-weight: 650; }
+.rating-card [hidden] { display: none; }
+
+.proof-timing { margin-top: .5rem; }

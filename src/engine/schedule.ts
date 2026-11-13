@@ -2,7 +2,10 @@ import { mixSteps, preheatDetail, type MixMethod } from './methods';
 import { fullStepText, STEP_COVER, stepTimer, type Cover, type StepAmounts, type StepIngredient, type StepTimer } from './stepText';
 import type { Formula } from './types';
 
-export type StepKey = 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'preheat' | 'bake';
+export type StepKey =
+  | 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'preheat' | 'bake'
+  // Bread steps (engine/bread/schedule.ts).
+  | 'fold2' | 'fold3' | 'fold4' | 'shape' | 'proofCheck' | 'lidOff' | 'out' | 'slice';
 
 export interface Step {
   key: StepKey;
