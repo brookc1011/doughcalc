@@ -197,6 +197,22 @@ describe('schedule', () => {
       mixAt: new Date('2026-11-07T10:00:00'),
     });
     expect(sch.steps.some((s) => s.key === 'fridge')).toBe(true);
+    // Room-proofed: the fridge comes an hour after balling, so it stays its own step.
+    expect(sch.steps.find((s) => s.key === 'ball')!.label).toBe('Divide and ball');
+  });
+  it('fridge-proofed dough: balling and into the fridge are one step', () => {
+    const sch = buildSchedule({
+      formula: overnight,
+      eatAt: new Date('2026-11-08T18:00:00'),
+      stageH: 12,
+      warmUpH: 1.5,
+      mixAt: new Date('2026-11-06T19:00:00'),
+    });
+    expect(sch.steps.some((s) => s.key === 'fridge')).toBe(false);
+    const ball = sch.steps.find((s) => s.key === 'ball')!;
+    expect(ball.label).toBe('Divide, ball and into the fridge');
+    expect(ball.detail).toContain('Covered');
+    expect(sch.steps.some((s) => s.key === 'pull')).toBe(true);
   });
 });
 

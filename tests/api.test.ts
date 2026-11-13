@@ -227,11 +227,12 @@ describe('bake help: method, preheat, yeast, flour', () => {
     expect(cover.mix).toBe('on');
     expect(cover.fold).toBe('on');
     expect(cover.ball).toBe('off');
-    expect(cover.fridge).toBe('on');
+    // Fridge-proofed dough: balling and into the fridge are one step that ends under plastic wrap.
+    expect(cover.fridge).toBeUndefined();
     expect(cover.preheat).toBeUndefined();
     expect(cover.bake).toBeUndefined();
     expect(steps.find((s) => s.key === 'mix')!.detail).toContain('put the lid on');
-    expect(steps.find((s) => s.key === 'ball')!.detail).toContain('No cover needed');
+    expect(steps.find((s) => s.key === 'ball')!.detail).toContain('cover with plastic wrap, and into the fridge');
   });
 
   it('mix step: soft and sticky is expected; mixer minutes follow the setting and say whose they are', async () => {

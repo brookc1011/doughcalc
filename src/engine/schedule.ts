@@ -130,17 +130,26 @@ export function buildSchedule(input: ScheduleInput): Schedule {
     at: add(mix, p.foldAfterMin * M),
     detail: full?.fold ?? how.fold,
   });
-  steps.push({ key: 'ball', label: 'Divide and ball', at: ball, detail: full?.ball ?? 'Medium-tight rounds; do not degas.' });
+  const ballText = full?.ball ?? 'Medium-tight rounds; do not degas.';
+  const fridgeText = full?.fridge ?? 'Covered, on a lightly floured tray.';
   // Room-proofed doughs baked much later than their minimum go in the fridge after a short rest
   // (FWSY p.219: rest 30-60 minutes, then refrigerate).
   const heldCold = fridge || ballAgeH > p.minProofH + warmUpH;
-  if (heldCold) {
+  if (fridge) {
+    // Fridge-proofed doughs go in the fridge as soon as they're balled: one step, not two at the same minute.
     steps.push({
-      key: 'fridge',
-      label: 'Into the fridge',
-      at: fridge ? ball : add(ball, 60 * M),
-      detail: full?.fridge ?? 'Covered, on a lightly floured tray.',
+      key: 'ball',
+      label: 'Divide, ball and into the fridge',
+      at: ball,
+      detail: `${ballText.replace(/ No cover needed while you shape\.$/, '')} ${fridgeText}`,
     });
+  } else {
+    steps.push({ key: 'ball', label: 'Divide and ball', at: ball, detail: ballText });
+  }
+  if (heldCold) {
+    if (!fridge) {
+      steps.push({ key: 'fridge', label: 'Into the fridge', at: add(ball, 60 * M), detail: fridgeText });
+    }
     steps.push({
       key: 'pull',
       label: 'Take balls out of the fridge',
