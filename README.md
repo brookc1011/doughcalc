@@ -29,8 +29,8 @@ npm run guard      # confirms engine/data/api are unchanged
 npm run guard:update   # after an intentional engine change, with tests passing
 ```
 
-## Deploy (Cloudflare Pages, private repo)
-1. Push this folder to a private GitHub repo.
+## Deploy (Cloudflare Pages)
+1. Push this folder to a GitHub repo.
 2. Cloudflare dashboard → Workers & Pages → Create → Pages → Connect to Git → pick the repo.
 3. Build command `npm run build`, output directory `dist`.
 4. Open the site in Chrome on the phone → menu → Install app.
