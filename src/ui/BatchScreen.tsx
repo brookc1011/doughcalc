@@ -189,17 +189,20 @@ function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepK
   }, [running]);
   const label = timer.kind === 'countdown' ? `Start ${timer.min} min timer` : 'Start stopwatch';
   return (
-    <div className="step-timer">
+    <div className={running ? "step-timer active-timer" : "step-timer"}>
       {running && st ? (
         <>
-          <b role="timer">{st.done ? 'Time’s up' : clock(st.ms)}</b>{' '}
+          <div className="timer-reading">
+            <span className="muted small">{timer.kind === 'stopwatch' ? 'Elapsed' : 'Time left'}</span>
+            {st.done ? <strong role="status">Time’s up</strong> : <strong role="timer">{clock(st.ms)}</strong>}
+          </div>
           <button className="link small" onClick={async () => onChange(await stopTimer(batch.id))}>
             {st.done ? 'Clear' : 'Stop'}
           </button>
         </>
       ) : (
         <button className="small" onClick={async () => { setNow(Date.now()); onChange(await startTimer(batch.id, stepKey)); }}>
-          {label}
+          {st && !running ? label.replace('Start ', 'Switch to ') : label}
         </button>
       )}
       <div className="muted small">
@@ -215,9 +218,9 @@ function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepK
 function BulkRoomPrompt({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; onChange: (b: Batch) => void }) {
   const [v, setV] = useState('');
   return (
-    <div className="card bulk-room" role="group" aria-label="Room temperature during the rise">
+    <div className="bulk-room" role="group" aria-label="Room temperature during the rise">
       <label>
-        Room temperature while the dough rises (°{unit})
+        Room temperature during the rise (°{unit}) <span className="field-hint">Optional</span>
         <input type="number" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} />
       </label>
       <div className="step-actions">
@@ -242,6 +245,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
   const remindOn = !!batch.actual.reminders;
   const perm = pushPermission();
   const allDone = !prog.nextKey;
+  const showBulkRoom = wantsBulkRoomTemp(batch);
   // Before anything is ticked, the first step starts whenever you do.
   const firstUntouched = prog.steps.some((s) => s.doneAt || s.passed) ? undefined : prog.steps[0]?.key;
 
@@ -307,7 +311,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
         </div>
       )}
 
-      {wantsBulkRoomTemp(batch) && <BulkRoomPrompt batch={batch} unit={unit} onChange={onChange} />}
+
 
       {prog.movedTo && (
         <p className="warn" role="status">
@@ -336,24 +340,6 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   Planned for {fmtWhen(s.at)}. The steps after it follow from when you tap Done.
                 </div>
               )}
-              {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.detail}</div>}
-              {!s.doneAt && !s.passed && s.cover && (
-                <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'No cover while you shape'}</div>
-              )}
-              {!s.doneAt && !s.passed && s.ingredients && (
-                <details className="step-amounts">
-                  <summary className="small">What goes in</summary>
-                  <div className="small">
-                    {s.ingredients.map((x) => (
-                      <div key={x.name}>
-                        {x.name}: {x.amount}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-              {!s.doneAt && !s.passed && s.timer && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} onChange={onChange} />}
-              {!s.doneAt && !s.passed && gap && <div className="small step-gap">{gap}</div>}
               {!s.doneAt && !s.passed && (
                 <div className="step-actions">
                   <button className={state === 'next' ? 'small primary-small' : 'small'} aria-label={`Mark ${s.label} done now`} onClick={() => check(s.key)}>
@@ -391,11 +377,30 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   </div>
                 </div>
               )}
+              {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail}</div>}
+              {!s.doneAt && !s.passed && s.cover && (
+                <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'Lid off while shaping'}</div>
+              )}
+              {!s.doneAt && !s.passed && !!s.ingredients?.length && (
+                <details key={state} open={state === 'next'} className="step-amounts">
+                  <summary className="small">What goes in</summary>
+                  <dl>
+                    {s.ingredients.map((x) => (
+                      <div key={x.name}>
+                        <dt>{x.name}</dt><dd>{x.amount}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              )}
+              {!s.doneAt && !s.passed && s.timer && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} onChange={onChange} />}
+              {!s.doneAt && !s.passed && gap && <div className="small step-gap">{gap}</div>}
+              {s.key === 'fold' && showBulkRoom && <BulkRoomPrompt batch={batch} unit={unit} onChange={onChange} />}
             </li>
           );
         })}
       </ol>
-      {allDone && <p className="muted small">All steps done. Dinner was {timeOnly(prog.eatAt)}. Rate it below.</p>}
+      {allDone && <p className="muted small">All steps done. Bake time was {timeOnly(prog.eatAt)}. Rate it below.</p>}
     </section>
   );
 }

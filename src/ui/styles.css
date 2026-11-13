@@ -895,3 +895,26 @@ input, select, textarea {
 }
 
 .step-gap { margin-top: 4px; font-weight: 600; }
+
+/* Tools stay with their step. Ingredient values can wrap at larger text sizes. */
+.checklist-steps .step-actions { margin: 8px 0 12px; }
+.step-cover { display: inline-block; margin: 6px 0; color: var(--muted); font-weight: 650; }
+.step-amounts { margin: 8px 0; border-block: 1px solid var(--line); }
+.step-amounts summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 650; }
+.step-amounts dl { margin: 0 0 10px; }
+.step-amounts dl > div {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 10px; align-items: baseline; padding: 5px 0;
+}
+.step-amounts dt { color: var(--muted); }
+.step-amounts dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.step-timer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 12px 0; }
+.step-timer > .muted { flex-basis: 100%; }
+.active-timer { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 12px; }
+.timer-reading { flex: 1; }
+.timer-reading strong { display: block; color: var(--accent); font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+.bulk-room { margin-top: 12px; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.bulk-room label { margin: 0; }
+.bulk-room input { max-width: 10rem; display: block; }
+.bulk-room .step-actions { margin-bottom: 0; }
+ol.checklist-steps li.done:has(.bulk-room) { opacity: 1; }
