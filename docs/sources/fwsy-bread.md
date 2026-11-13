@@ -53,7 +53,21 @@ Page numbers: p.81, p.85 and p.89 come from the book's own cross-references (the
 | Fine sea salt | 22 g | 1 tbsp + 1 tsp | 2.2% |
 | Instant dried yeast | 0.8 g | scant ¼ tsp | 0.08% |
 
-**Variation: Weeknight White Bread (Overnight White method pages, page number not shown)**
+- The extended bulk gives more flavor complexity than the two Saturday breads. Bake well beyond the blond stage for a crisp crust. Water 90-95°F is 32-35°C.
+
+**Method (two pages after p.89, page numbers not shown; photographed 2026-11-13)**
+1. **Autolyse.** 1,000 g flour and 780 g water at 90-95°F in a 12-quart round tub or similar. Mix by hand just until incorporated. Cover, rest 20-30 minutes.
+2. **Mix.** Sprinkle the 22 g salt and 0.8 g yeast (scant ¼ tsp) evenly over the top. Wet your mixing hand first; rewetting three or four times is fine. Reach under, grab about a quarter of the dough, stretch it and fold it over the top; repeat three more times until salt and yeast are enclosed. Then pincer method: five or six pincer cuts across the whole mass, fold the dough over itself a few times, repeat until fully integrated with some tension. Rest a few minutes, then fold another 30 seconds or until it tightens. **Target dough temperature at end of mix: 77-78°F (25-26°C).** Cover and let rise.
+3. **Fold.** Two or three folds (pp.69-70). Three is best for gas retention and volume; two is fine. Easiest to do them in the first 1½ hours after mixing. After the last fold, cover and let it rise overnight **at room temperature**. Ready to divide when it is **2½-3 times its original volume, 12-14 hours after mixing.**
+4. **Divide.** Moderately flour a work surface about 2 feet wide. Flour your hands and around the tub edges, tip the tub, work a floured hand under the dough to loosen it, and ease it out without pulling or tearing. Pick it up and ease it back down in a somewhat even shape. Flour the middle and cut into 2 equal pieces with a dough knife or plastic scraper.
+5. **Shape.** Dust 2 proofing baskets with flour. Shape each piece into a medium-tight ball (pp.71-73). Seam side down in the basket.
+6. **Proof.** Lightly flour the loaf tops. Side by side under a kitchen towel, or each basket in a nonperforated plastic bag. Plan to bake about **1¼ hours after shaping at about 70°F (21°C)**; in a warmer kitchen, about 1 hour. Use the finger-dent test (p.74) and **check after 1 hour**. With this bread 15 minutes can be the difference between perfectly proofed and collapsing a bit.
+7. **Preheat.** At least 45 minutes before baking: rack in the middle, 2 Dutch ovens on it with lids on, 475°F (245°C). With only 1 Dutch oven, put the second loaf in the fridge **about 20 minutes** before baking the first, bake them one after the other, and give the Dutch oven a **5-minute reheat** after removing the first loaf.
+8. **Bake.** Don't let hands, fingers or forearms touch the hot Dutch oven. Invert the loaf onto a lightly floured counter; the top of the loaf is the seam side. Mitts on, take out the Dutch oven, lid off, loaf in seam side up, lid back on, into the oven at 475°F. **30 minutes lid on, then 20-30 minutes lid off**, until at least medium dark brown all around. Check after 15 minutes uncovered in case your oven runs hot. Tilt the loaf out, cool on a rack or on its side so air circulates, **rest at least 20 minutes before slicing.**
+
+Differences from the general ch. 4 notes (fwsy-general.md): this recipe's lid-off time is 20-30 minutes (general: usually 15-20), the one-Dutch-oven fridge lead is about 20 minutes (general: 15-20), and the method page states the overnight rise is at room temperature, which the intro page did not.
+
+**Variation: Weeknight White Bread (second method page, page number not shown)**
 - Follow Overnight White through step 3. Next morning before work, 5-10 minutes to divide and shape. Proofing baskets go in plastic bags in the fridge while you're at work.
 - Home at 6 p.m.: take the loaves out and let them finish proofing on the counter while the Dutch ovens preheat. Bread by 7:30 p.m.
 - **Bulk:** 12-14 hours. **Proof:** about 10 hours, depending on when you get home.
@@ -318,7 +332,7 @@ Page numbers inside the essay aren't shown; the essay starts at p.190 per the Pa
 - **Seasonal advice (p.134):** "too sour", "slow in winter" and "warm kitchen" give the bread advice sourced direction: cooler feed water or earlier mix; keep 30-50 g more at the feed; mix 1-2 h earlier.
 - **Yeast anchors for yeasted bread:** Saturday White 4 g for about 5 h bulk, Overnight White 0.8 g for 12-14 h. These anchor the existing rate law. Overnight White's 0.8 g matches the pizza overnight dose (FWSY p.220).
 - **Fridge proof for straight doughs:** Overnight 40% (12-14 h) and Weeknight White (about 10 h). The plan's "retard window" is not levain-only.
-- **First-release candidates:** Saturday White (simplest, one day) or Overnight White. CJ picks one and sends its method pages.
+- **First-release candidates:** Saturday White (simplest, one day) or Overnight White. CJ picked Overnight White (2026-11-13); its method pages are transcribed above.
 - **Poolish bread:** no autolyse, 80°F poolish water, 105°F final water. The pizza poolish detection stays separate, as the plan says.
 - **Built vs. used is settled (ch. 9-10):** every levain recipe builds the full daily feed and uses part of it: 360 g in hybrid recipes, 216 g in Country Brown, 425 g in the Warm-Spot bread (a 70% levain), 400 g with liquid levain. The levain's hydration varies by recipe, so it belongs on the recipe's levain line, not only on the starter. The rest stays in the tub for the next feed or goes to the fridge. The "In levain" column breaks the used amount into flour and water, so only that portion counts toward totals, as the plan already says.
 - **Levain percentage means flour, not weight:** the book's levain % is the flour inside the used levain over total flour (20% hybrid, 12% pure, 25% warm-spot). The engine should store the used grams and the starter's hydration, and derive that figure in code.
