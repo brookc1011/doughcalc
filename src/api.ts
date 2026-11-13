@@ -125,7 +125,8 @@ export function ballForDiameter(refBallG: number, refDiameterIn: number, newDiam
 }
 
 export { defaultStageH };
-export { gapToNext } from './engine/stepText';
+export { gapToNext, DEFAULT_MIXER_MIN, MIXER_MIN_SOURCE } from './engine/stepText';
+export type { Cover, StepIngredient, StepTimer } from './engine/stepText';
 
 // ---------- planning ----------
 export interface PlanForm {
@@ -141,6 +142,8 @@ export interface PlanForm {
   startAt?: Date;
   manualYeastPct?: number;
   yeastType?: YeastType;
+  /** Flour picked on the form. All-purpose adds King Arthur's less-water note to the first step. */
+  flour?: Flour;
 }
 
 export function makePlan(form: PlanForm, s: Settings): Plan {
@@ -158,6 +161,8 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
     kitchenFactor: s.kitchenFactor,
     mixer: form.mixer,
     preheatMin: s.preheatMin,
+    mixerMin: s.mixerMin,
+    apFlour: (form.flour ?? s.flour) === 'ap',
     yeastType: form.yeastType ?? s.yeastType,
     temp: {
       bandLowF: s.bandLowF,
@@ -193,6 +198,7 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
       steps: plan.schedule.steps.map(toRecord),
       stepVersion: 3 as const,
       preheatMin: i.preheatMin,
+      mixerMin: i.mixerMin,
       yeastType: i.yeastType ?? 'instant',
       flour,
     }),
@@ -235,7 +241,10 @@ export function batchProgress(b: Batch): Progress {
       mixer: p.stepVersion ? p.mixer : 'hand',
       preheatMin: p.stepVersion ? p.preheatMin : undefined,
       // Version 3 on: full step text with this batch's grams.
-      amounts: p.stepVersion === 3 ? { parts: p.recipe.parts, water: p.water, balls: p.balls } : undefined,
+      amounts:
+        p.stepVersion === 3
+          ? { parts: p.recipe.parts, water: p.water, balls: p.balls, mixerMin: p.mixerMin, apFlour: p.flour === 'ap' }
+          : undefined,
     },
     done,
   );
@@ -267,6 +276,60 @@ export async function uncheckStep(batchId: string, key: string): Promise<Batch> 
   const next = { ...b, actual };
   await store.saveBatch(next);
   return syncReminders(next);
+}
+
+// ---------- step timers ----------
+/** Start the timer offered on a step. A countdown also buzzes through reminders when they're on. */
+export async function startTimer(batchId: string, key: string, now: Date = new Date()): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const t = batchProgress(b).steps.find((s) => s.key === key)?.timer;
+  if (!t) throw new Error('No timer on this step');
+  const endAt = t.kind === 'countdown' ? new Date(now.getTime() + t.min * 60_000).toISOString() : undefined;
+  const next = { ...b, actual: { ...b.actual, timer: { key, startedAt: now.toISOString(), endAt } } };
+  await store.saveBatch(next);
+  return syncReminders(next);
+}
+
+export async function stopTimer(batchId: string): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const actual: Actual = { ...b.actual };
+  delete actual.timer;
+  const next = { ...b, actual };
+  await store.saveBatch(next);
+  return syncReminders(next);
+}
+
+/** The running timer as the screen needs it: which step, and ms left (countdown) or elapsed (stopwatch). */
+export function timerState(b: Batch, now = Date.now()) {
+  const t = b.actual.timer;
+  if (!t) return undefined;
+  const started = Date.parse(t.startedAt);
+  if (t.endAt) {
+    const left = Date.parse(t.endAt) - now;
+    return { key: t.key, kind: 'countdown' as const, ms: Math.max(0, left), done: left <= 0 };
+  }
+  return { key: t.key, kind: 'stopwatch' as const, ms: Math.max(0, now - started), done: false };
+}
+
+// ---------- room temperature during the bulk rise ----------
+/** Ask once the fold is checked off, until answered or skipped. */
+export function wantsBulkRoomTemp(b: Batch): boolean {
+  return !!b.actual.done?.fold && b.actual.bulkRoomF === undefined && !b.actual.bulkRoomSkipped;
+}
+
+/** Record the room temperature during the bulk rise (in the app's unit), or null to skip. Stored in °F. */
+export async function recordBulkRoomTemp(batchId: string, value: number | null, unit: 'F' | 'C'): Promise<Batch> {
+  const b = await store.getBatch(batchId);
+  if (!b) throw new Error('Batch not found');
+  const actual: Actual =
+    value === null
+      ? { ...b.actual, bulkRoomSkipped: true }
+      : { ...b.actual, bulkRoomF: unit === 'C' ? (value * 9) / 5 + 32 : value, bulkRoomSkipped: undefined };
+  const next = { ...b, actual };
+  await store.saveBatch(next);
+  return next;
 }
 
 // ---------- reminders ----------
@@ -334,13 +397,22 @@ export const MAX_REMINDER_LEAD_MIN = 60;
  */
 export function reminderItems(b: Batch, leadMin = 0, now = Date.now()) {
   const lead = Math.min(Math.max(0, Math.round(leadMin)), MAX_REMINDER_LEAD_MIN);
-  return batchProgress(b)
-    .steps.filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
+  const steps = batchProgress(b).steps;
+  const items = steps
+    .filter((s) => !s.doneAt && !s.passed && s.at.getTime() > now)
     .map((s) => ({
       at: new Date(Math.max(s.at.getTime() - lead * 60_000, now)).toISOString(),
       title: s.label,
       body: lead ? `${b.planned.formula.name} · in ${lead} min` : b.planned.formula.name,
     }));
+  // A running countdown buzzes when it ends: the step's name, the dough's name, no heads-up.
+  const t = b.actual.timer;
+  if (t?.endAt && Date.parse(t.endAt) > now) {
+    const label = steps.find((s) => s.key === t.key)?.label ?? 'Timer';
+    items.push({ at: t.endAt, title: `${label}: time’s up`, body: b.planned.formula.name });
+    items.sort((a, c) => Date.parse(a.at) - Date.parse(c.at));
+  }
+  return items;
 }
 
 /** Save the heads-up and re-send the times for every batch with reminders on. */

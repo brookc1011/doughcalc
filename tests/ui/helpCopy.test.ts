@@ -5,7 +5,7 @@ import { READY_WINDOW_SOURCE } from '../../src/ui/presentation';
 describe('help and attribution contracts', () => {
   it('retains every extracted explanation', () => {
     expect(Object.keys(HELP_COPY).sort()).toEqual([
-      'dough balls', 'flour', 'heads-up time', 'kitchen adjustment', 'mixing method', 'planning times', 'preheat time',
+      'dough balls', 'flour', 'heads-up time', 'kitchen adjustment', 'mixer time', 'mixing method', 'planning times', 'preheat time',
       'reminder privacy', 'room temperature', 'saved defaults', 'warm-up time', 'water temperature and friction',
       'yeast override', 'yeast type',
     ]);

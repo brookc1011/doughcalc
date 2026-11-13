@@ -15,13 +15,19 @@ import {
   getBatch,
   photoUrl,
   pushPermission,
+  recordBulkRoomTemp,
   remindersOff,
+  startTimer,
+  stopTimer,
+  timerState,
+  wantsBulkRoomTemp,
   remindersOn,
   suggestions,
   uncheckStep,
   updateActual,
   type Batch,
   type Settings,
+  type StepTimer,
   type Suggestion,
   type Survey,
 } from '../api';
@@ -90,7 +96,7 @@ export function BatchScreen({
         </section>
       )}
 
-      <Checklist batch={batch} onChange={setBatch} />
+      <Checklist batch={batch} unit={unit} onChange={setBatch} />
 
 <section id={BATCH_TARGETS.recipe} tabIndex={-1} aria-label="Batch recipe">
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
@@ -166,8 +172,68 @@ function StepCountdown({ at }: { at: number }) {
   return <> · in {duration}</>;
 }
 
+const clock = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** Timer for one step: countdown (sourced minutes) or stopwatch (no source gives a time). */
+function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepKey: string; timer: StepTimer; onChange: (b: Batch) => void }) {
+  const [now, setNow] = useState(Date.now);
+  const st = timerState(batch, now);
+  const running = st?.key === stepKey;
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [running]);
+  const label = timer.kind === 'countdown' ? `Start ${timer.min} min timer` : 'Start stopwatch';
+  return (
+    <div className="step-timer">
+      {running && st ? (
+        <>
+          <b role="timer">{st.done ? 'Time’s up' : clock(st.ms)}</b>{' '}
+          <button className="link small" onClick={async () => onChange(await stopTimer(batch.id))}>
+            {st.done ? 'Clear' : 'Stop'}
+          </button>
+        </>
+      ) : (
+        <button className="small" onClick={async () => { setNow(Date.now()); onChange(await startTimer(batch.id, stepKey)); }}>
+          {label}
+        </button>
+      )}
+      <div className="muted small">
+        {timer.kind === 'countdown'
+          ? `${timer.source}${timer.upToMin ? `, up to ${timer.upToMin} min` : ''}`
+          : timer.note}
+      </div>
+    </div>
+  );
+}
+
+/** After the fold: room temperature during the bulk rise, optional. */
+function BulkRoomPrompt({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; onChange: (b: Batch) => void }) {
+  const [v, setV] = useState('');
+  return (
+    <div className="card bulk-room" role="group" aria-label="Room temperature during the rise">
+      <label>
+        Room temperature while the dough rises (°{unit})
+        <input type="number" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} />
+      </label>
+      <div className="step-actions">
+        <button className="small primary-small" disabled={v === '' || !Number.isFinite(Number(v))} onClick={async () => onChange(await recordBulkRoomTemp(batch.id, Number(v), unit))}>
+          Save
+        </button>
+        <button className="link small" onClick={async () => onChange(await recordBulkRoomTemp(batch.id, null, unit))}>
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** The batch's steps as a checklist. Checking one off re-times the steps after it. */
-function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => void }) {
+function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; onChange: (b: Batch) => void }) {
   const prog = batchProgress(batch);
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [pickAt, setPickAt] = useState('');
@@ -241,6 +307,8 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
         </div>
       )}
 
+      {wantsBulkRoomTemp(batch) && <BulkRoomPrompt batch={batch} unit={unit} onChange={onChange} />}
+
       {prog.movedTo && (
         <p className="warn" role="status">
           Running behind: the balls need their full rest, so the bake moves to {fmtWhen(prog.movedTo)}.
@@ -269,6 +337,22 @@ function Checklist({ batch, onChange }: { batch: Batch; onChange: (b: Batch) => 
                 </div>
               )}
               {!s.doneAt && !s.passed && <div className="muted small step-detail">{s.detail}</div>}
+              {!s.doneAt && !s.passed && s.cover && (
+                <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'No cover while you shape'}</div>
+              )}
+              {!s.doneAt && !s.passed && s.ingredients && (
+                <details className="step-amounts">
+                  <summary className="small">What goes in</summary>
+                  <div className="small">
+                    {s.ingredients.map((x) => (
+                      <div key={x.name}>
+                        {x.name}: {x.amount}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {!s.doneAt && !s.passed && s.timer && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} onChange={onChange} />}
               {!s.doneAt && !s.passed && gap && <div className="small step-gap">{gap}</div>}
               {!s.doneAt && !s.passed && (
                 <div className="step-actions">

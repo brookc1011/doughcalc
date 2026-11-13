@@ -35,6 +35,10 @@ export interface PlanInput {
   mixer?: MixMethod;
   /** Oven preheat before the first pizza, minutes. Adds a preheat step. */
   preheatMin?: number;
+  /** Mixer minutes, baker's setting (default 5, America's Test Kitchen). */
+  mixerMin?: number;
+  /** All-purpose flour chosen: adds King Arthur's less-water note to the first step. */
+  apFlour?: boolean;
   yeastType?: YeastType;
 }
 
@@ -111,7 +115,7 @@ export function planBatch(raw: PlanInput): Plan {
     mixAt: input.mixAt,
     mixer: input.mixer,
     preheatMin: input.preheatMin,
-    amounts: { parts: recipe.parts, water, balls: input.balls },
+    amounts: { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour },
   });
 
   const errors = [...recipe.errors, ...schedule.errors];

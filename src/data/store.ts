@@ -34,6 +34,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // King Arthur: preheat a stone or steel "at least an hour" (How to make pizza crust crispy, 2024).
   // Baking Steel says 45-60 minutes. Editable in Settings.
   preheatMin: 60,
+  // America's Test Kitchen "Pizza Dough Kneaded in a Standing Mixer": about 5 minutes. Editable in Settings.
+  mixerMin: 5,
   yeastType: 'instant',
 };
 

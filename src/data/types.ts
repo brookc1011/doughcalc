@@ -41,6 +41,8 @@ export interface Settings {
   yeastType?: YeastType;
   /** Flour last used, carried to the next plan. */
   flour?: Flour;
+  /** Stand mixer minutes. Default 5 (America's Test Kitchen); anything else is the baker's choice. */
+  mixerMin?: number;
 }
 
 /** Flour choices tracked per batch. Info only: the steps don't change (see helpCopy "flour"). */
@@ -74,6 +76,7 @@ export interface PlannedSnapshot {
   preheatMin?: number;
   yeastType?: YeastType;
   flour?: Flour;
+  mixerMin?: number;
 }
 
 /** What actually happened. Editable any time. */
@@ -89,6 +92,12 @@ export interface Actual {
   reminders?: boolean;
   /** Set when the last reminder update didn't reach the server (e.g. no signal); retried later. */
   reminderSync?: 'pending';
+  /** A running step timer. Countdowns have endAt; a stopwatch has none. */
+  timer?: { key: string; startedAt: string; endAt?: string };
+  /** Room temperature during the bulk rise, asked after the fold. °F. */
+  bulkRoomF?: number;
+  /** Set when the baker skipped the bulk room-temperature question. */
+  bulkRoomSkipped?: boolean;
 }
 
 export interface BakeSession {

@@ -54,6 +54,31 @@ describe('reminders', () => {
     }
   });
 
+  it('a running countdown adds one buzz at its end: step name, dough name, nothing else', async () => {
+    const b = await lockFuture();
+    const now = Date.now();
+    const before = api.reminderItems(b, 0, now).length;
+    const t = await api.startTimer(b.id, 'fold', new Date(now));
+    const items = api.reminderItems(t, 0, now);
+    expect(items.length).toBe(before + 1);
+    const end = items.find((i) => i.title.endsWith('time’s up'))!;
+    expect(Date.parse(end.at)).toBe(now + 30 * 60_000);
+    expect(end.body).toBe(b.planned.formula.name);
+    expect(Object.keys(end).sort()).toEqual(['at', 'body', 'title']);
+    // A stopwatch has no end, so it sends nothing extra.
+    const sw = await api.startTimer(b.id, 'mix', new Date(now));
+    expect(api.reminderItems(sw, 0, now).length).toBe(before);
+  });
+
+  it('starting a timer re-sends reminders when they are on', async () => {
+    const b = await lockFuture();
+    await api.remindersOn(b.id);
+    const before = push.sent.length;
+    await api.startTimer(b.id, 'fold');
+    expect(push.sent.length).toBe(before + 1);
+    expect(push.sent.at(-1)!.items.some((i) => i.title.endsWith('time’s up'))).toBe(true);
+  });
+
   it('heads-up: each reminder is due that many minutes before its step, and says so', async () => {
     const b = await lockFuture();
     const steps = api.batchProgress(b).steps;

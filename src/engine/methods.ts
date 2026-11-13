@@ -21,7 +21,7 @@ export function mixSteps(method: MixMethod, poolish: boolean): MixText {
   const fold = 'One or two folds, then oil the dough and tub lightly.';
   if (method === 'mixer') {
     return {
-      mix: `${add} Dough hook on speed 2 (KitchenAid) for about 5 minutes, until smooth and elastic (America's Test Kitchen).`,
+      mix: `${add} Dough hook on speed 2 (KitchenAid) for about 5 minutes (America's Test Kitchen). It will still be soft and sticky; the folds build its strength.`,
       fold,
     };
   }

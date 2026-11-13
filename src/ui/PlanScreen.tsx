@@ -104,13 +104,14 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
         startAt: timing === 'eat' ? undefined : new Date(startAt),
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
         yeastType,
+        flour: flour || undefined,
       },
       settings,
     );
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, yeastType, settings, unit],
+    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.

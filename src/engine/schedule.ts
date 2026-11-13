@@ -1,5 +1,5 @@
 import { mixSteps, preheatDetail, type MixMethod } from './methods';
-import { fullStepText, type StepAmounts } from './stepText';
+import { fullStepText, STEP_COVER, stepTimer, type Cover, type StepAmounts, type StepIngredient, type StepTimer } from './stepText';
 import type { Formula } from './types';
 
 export type StepKey = 'poolish' | 'autolyse' | 'mix' | 'fold' | 'ball' | 'fridge' | 'pull' | 'preheat' | 'bake';
@@ -9,6 +9,12 @@ export interface Step {
   label: string;
   at: Date;
   detail: string;
+  /** Lid on or off during this step. Missing: doesn't apply (oven steps). */
+  cover?: Cover;
+  /** Timer offered on this step, with its source. */
+  timer?: StepTimer;
+  /** What goes in at this step (stepVersion 3 batches and new plans). */
+  ingredients?: StepIngredient[];
 }
 
 export interface ScheduleInput {
@@ -152,6 +158,12 @@ export function buildSchedule(input: ScheduleInput): Schedule {
   }
   steps.push({ key: 'bake', label: 'Bake', at: eatAt, detail: 'First pizza in. Stretch, top and bake.' });
 
+  const method = input.mixer ?? 'hand';
+  for (const st of steps) {
+    st.cover = STEP_COVER[st.key];
+    st.timer = stepTimer(st.key, method, input.amounts?.mixerMin);
+    st.ingredients = full?.ingredients[st.key as keyof typeof full.ingredients];
+  }
   steps.sort((a, b) => a.at.getTime() - b.at.getTime());
   return { steps, errors, ballAgeH };
 }

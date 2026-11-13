@@ -219,6 +219,103 @@ describe('bake help: method, preheat, yeast, flour', () => {
     expect(api.batchProgress(v2).steps[0].detail).not.toContain('3 tbsp');
   });
 
+  it('every dough step says lid on or off; oven steps say nothing', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    const steps = api.batchProgress(b).steps;
+    const cover = Object.fromEntries(steps.map((s) => [s.key, s.cover]));
+    expect(cover.autolyse).toBe('on');
+    expect(cover.mix).toBe('on');
+    expect(cover.fold).toBe('on');
+    expect(cover.ball).toBe('off');
+    expect(cover.fridge).toBe('on');
+    expect(cover.preheat).toBeUndefined();
+    expect(cover.bake).toBeUndefined();
+    expect(steps.find((s) => s.key === 'mix')!.detail).toContain('put the lid on');
+    expect(steps.find((s) => s.key === 'ball')!.detail).toContain('No cover needed');
+  });
+
+  it('mix step: soft and sticky is expected; mixer minutes follow the setting and say whose they are', async () => {
+    const plain = api.batchProgress(await api.lockIn(await plan('mixer'), 'mixer')).steps.find((s) => s.key === 'mix')!;
+    expect(plain.detail).toContain("about 5 minutes (America's Test Kitchen)");
+    expect(plain.detail).toContain('hold together as one mass');
+    expect(plain.detail).not.toContain('smooth and elastic');
+    expect(plain.timer).toEqual({ kind: 'countdown', min: 5, source: "America's Test Kitchen: about 5 minutes on low" });
+
+    await api.saveSettings({ ...(await api.getSettings()), mixerMin: 9 });
+    const b = await api.lockIn(await plan('mixer'), 'mixer');
+    expect(b.planned.mixerMin).toBe(9);
+    const mix = api.batchProgress(b).steps.find((s) => s.key === 'mix')!;
+    expect(mix.detail).toContain("9 minutes (your setting; America's Test Kitchen says about 5)");
+    expect(mix.timer).toMatchObject({ kind: 'countdown', min: 9, source: 'Your setting' });
+  });
+
+  it('timers: autolyse 20 up to 30 (FWSY), fold 30 (King Arthur), hand mix is a stopwatch', async () => {
+    const steps = api.batchProgress(await api.lockIn(await plan('hand'), 'hand')).steps;
+    const t = (k: string) => steps.find((s) => s.key === k)!.timer;
+    expect(t('autolyse')).toMatchObject({ kind: 'countdown', min: 20, upToMin: 30 });
+    expect(t('autolyse')).toMatchObject({ source: expect.stringContaining('FWSY p.220') });
+    expect(t('fold')).toMatchObject({ kind: 'countdown', min: 30 });
+    expect(t('mix')!.kind).toBe('stopwatch');
+    expect(t('ball')).toBeUndefined();
+  });
+
+  it('each step lists what goes in, with this batch\u2019s grams', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    const steps = api.batchProgress(b).steps;
+    const salt = b.planned.recipe.parts[0].ingredients.find((i) => i.key === 'salt')!.grams;
+    const first = steps.find((s) => s.key === 'autolyse')!.ingredients!;
+    expect(first.map((i) => i.name)).toEqual(['Water', 'Flour', 'Instant yeast']);
+    expect(steps.find((s) => s.key === 'mix')!.ingredients).toContainEqual({ name: 'Salt', amount: `${Math.round(salt)} g` });
+    expect(steps.find((s) => s.key === 'ball')!.ingredients![0].name).toBe('Dough balls');
+    const v2 = { ...b, planned: { ...b.planned, stepVersion: 2 as const } };
+    expect(api.batchProgress(v2).steps.every((s) => !s.ingredients)).toBe(true);
+  });
+
+  it('all-purpose flour adds King Arthur\u2019s less-water note, with no amount', async () => {
+    const s = await api.getSettings();
+    const formula = await api.findDough(s.lastDoughId);
+    const p = api.makePlan(
+      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand', mixAt: new Date('2026-11-06T19:00:00'), flour: 'ap' },
+      s,
+    );
+    expect(p.schedule.steps[0].detail).toContain('King Arthur says to use less water');
+    const b = await api.lockIn(p, 'hand', 'ap');
+    expect(api.batchProgress(b).steps[0].detail).toContain('use less water');
+    const b00 = await api.lockIn(await plan('hand'), 'hand', '00');
+    expect(api.batchProgress(b00).steps[0].detail).not.toContain('less water');
+  });
+
+  it('bulk room temperature: asked after the fold, stored in °F, or skipped', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    expect(api.wantsBulkRoomTemp(b)).toBe(false);
+    const folded = await api.checkStep(b.id, 'fold', new Date('2026-11-06T20:00:00'));
+    expect(api.wantsBulkRoomTemp(folded)).toBe(true);
+    const c = await api.recordBulkRoomTemp(b.id, 20, 'C');
+    expect(c.actual.bulkRoomF).toBe(68);
+    expect(api.wantsBulkRoomTemp(c)).toBe(false);
+    expect((await api.getBatch(b.id))!.actual.bulkRoomF).toBe(68);
+
+    const b2 = await api.lockIn(await plan('hand'), 'hand');
+    await api.checkStep(b2.id, 'fold', new Date('2026-11-06T20:00:00'));
+    const skipped = await api.recordBulkRoomTemp(b2.id, null, 'F');
+    expect(skipped.actual.bulkRoomSkipped).toBe(true);
+    expect(api.wantsBulkRoomTemp(skipped)).toBe(false);
+  });
+
+  it('step timer: a countdown ends after its minutes, a stopwatch counts up, stop clears it', async () => {
+    const b = await api.lockIn(await plan('hand'), 'hand');
+    const t0 = new Date('2026-11-06T19:00:00');
+    const a = await api.startTimer(b.id, 'autolyse', t0);
+    expect(a.actual.timer).toEqual({ key: 'autolyse', startedAt: t0.toISOString(), endAt: new Date(t0.getTime() + 20 * 60_000).toISOString() });
+    expect(api.timerState(a, t0.getTime() + 60_000)).toMatchObject({ kind: 'countdown', ms: 19 * 60_000, done: false });
+    expect(api.timerState(a, t0.getTime() + 21 * 60_000)).toMatchObject({ ms: 0, done: true });
+    const m = await api.startTimer(b.id, 'mix', t0);
+    expect(m.actual.timer!.endAt).toBeUndefined();
+    expect(api.timerState(m, t0.getTime() + 90_000)).toMatchObject({ kind: 'stopwatch', ms: 90_000 });
+    expect((await api.stopTimer(b.id)).actual.timer).toBeUndefined();
+    await expect(api.startTimer(b.id, 'ball', t0)).rejects.toThrow('No timer');
+  });
+
   it('active dry from the form is stored on the batch', async () => {
     const b = await api.lockIn(await plan('hand', 'activeDry'), 'hand');
     expect(b.planned.yeastType).toBe('activeDry');

@@ -51,6 +51,13 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           </span>
           <NumField value={s.preheatMin ?? 60} onValue={(n) => save({ ...s, preheatMin: n })} />
         </label>
+        <label>
+          <span>
+            Stand mixer time (minutes)
+            <Info label="mixer time">{HELP_COPY["mixer time"]}</Info>
+          </span>
+          <NumField value={s.mixerMin ?? 5} onValue={(n) => save({ ...s, mixerMin: n })} />
+        </label>
       </section>
 
       <section className="card">
