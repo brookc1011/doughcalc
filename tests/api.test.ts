@@ -321,6 +321,28 @@ describe('bake help: method, preheat, yeast, flour', () => {
     expect(b.planned.yeastType).toBe('activeDry');
   });
 
+  it('active dry soaks in water warmed to 100-110°F; instant keeps the book wording', async () => {
+    const ady = await api.lockIn(await plan('hand', 'activeDry'), 'hand');
+    const idy = await api.lockIn(await plan('hand', 'instant'), 'hand');
+    expect(api.batchProgress(ady).steps[0].detail).toContain('3 tbsp of that water warmed to 100-110°F');
+    expect(api.batchProgress(idy).steps[0].detail).toContain('3 tbsp of that water and set it aside');
+    expect(api.batchProgress(idy).steps[0].detail).not.toContain('100-110');
+  });
+
+  it('rise temperature sets the yeast, is stored on the batch, and is not saved as a default', async () => {
+    const s = await api.getSettings();
+    const formula = await api.findDough(s.lastDoughId);
+    const form = { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand' as const, mixAt: new Date('2026-11-06T19:00:00') };
+    const warm = api.makePlan(form, s);
+    const cool = api.makePlan({ ...form, riseF: 65 }, s);
+    expect(cool.yeast.pct).toBeGreaterThan(warm.yeast.pct);
+    expect(cool.water).toEqual(warm.water);
+    const b = await api.lockIn(cool, 'hand');
+    expect(b.planned.riseF).toBe(65);
+    expect(b.planned.roomF).toBe(70);
+    expect((await api.getSettings()) as unknown as Record<string, unknown>).not.toHaveProperty('riseF');
+  });
+
   it('flour history averages overall scores per flour', async () => {
     const a = await api.lockIn(await plan('hand'), 'hand', '00');
     await api.addSession(a.id, { ovenId: 'home-oven', balls: 2, survey: { overall: 3 } });

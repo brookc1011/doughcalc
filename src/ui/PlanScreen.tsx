@@ -9,6 +9,7 @@ import {
   FLOUR_LABELS,
   defaultBalls,
   defaultStageH,
+  fmtTemp,
   fmtWhen,
   isPreset,
   lockIn,
@@ -54,6 +55,8 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
   const [timing, setTiming] = useState<TimingMode>('eat');
   const [startAt, setStartAt] = useState(toLocalInput(defaultStart()));
   const [room, setRoom] = useState(Math.round(unit === 'F' ? settings.roomF : fToC(settings.roomF)));
+  // Blank by default every time: a winter setback shouldn't carry into a summer bake.
+  const [rise, setRise] = useState('');
   const [mixer, setMixer] = useState<'hand' | 'mixer'>(repeat?.mixer ?? settings.mixer);
   const [yeastType, setYeastType] = useState<YeastType>(repeat ? repeat.yeastType ?? 'instant' : settings.yeastType ?? 'instant');
   const [flour, setFlour] = useState<Flour | ''>(repeat ? repeat.flour ?? '' : settings.flour ?? '');
@@ -91,6 +94,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
   const formula: Formula | undefined = base && { ...base, ...edits };
   const edited = Object.keys(edits).length > 0;
 
+  const riseNum = rise.trim() !== '' && Number.isFinite(Number(rise.replace(',', '.'))) ? Number(rise.replace(',', '.')) : undefined;
   const planFor = (f: Formula, ownStage = true) =>
     makePlan(
       {
@@ -98,6 +102,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
         balls,
         eatAt: new Date(eatAt),
         roomF: unit === 'F' ? room : cToF(room),
+        riseF: riseNum === undefined ? undefined : unit === 'F' ? riseNum : cToF(riseNum),
         stageH: ownStage ? stageH : undefined,
         mixer,
         timing,
@@ -111,7 +116,7 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit],
+    [formula, balls, eatAt, room, rise, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.
@@ -270,6 +275,27 @@ export function PlanScreen({ settings, go, onSaved, repeat }: { repeat?: Extract
           </span>
           <NumField value={room} onValue={setRoom} />
         </label>
+        <label>
+          <span>
+            Average room temperature over the whole rise (°{unit}) <span className="field-hint">Optional</span>
+            <Info label="rise temperature">{HELP_COPY["rise temperature"]}</Info>
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={rise}
+            placeholder={String(room)}
+            onChange={(e) => setRise(e.target.value)}
+          />
+        </label>
+        {plan.yeast.basis === 'estimate' && plan.input.riseF !== undefined && plan.yeast.anchor && plan.input.riseF < plan.yeast.anchor.tempF && (
+          <p className="fit-note">
+            Your rise is cooler than the {fmtTemp(plan.yeast.anchor.tempF, unit)}{' '}
+            {plan.yeast.anchor.tempAssumed ? 'the app assumes for the book amount' : 'the book uses'}, so the yeast is
+            scaled up (estimate). Or keep the dough warmer, for example in the oven with only the light on (check it with a
+            thermometer), and enter that temperature instead.
+          </p>
+        )}
         <fieldset className="bake-setup">
           <legend>Mixing &amp; ingredients</legend>
           <div className="setup-fields">

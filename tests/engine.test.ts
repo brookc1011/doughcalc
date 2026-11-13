@@ -436,3 +436,44 @@ describe('full step text (poolish)', () => {
     expect(steps.find((s) => s.key === 'mix')!.detail).toContain('Add all the poolish');
   });
 });
+
+describe('rise temperature (house cools during the bulk)', () => {
+  const base = {
+    formula: overnight,
+    balls: [{ count: 5, grams: 340 }],
+    eatAt: new Date('2026-11-08T18:00:00'),
+    roomF: 70,
+    warmUpH: 1.5,
+    temp: { bandLowF: 66, bandHighF: 74, frictionF: 2 },
+  };
+
+  it('blank rise behaves as before: book dose at 70°F', () => {
+    const p = planBatch(base);
+    expect(p.yeast.basis).toBe('book');
+    expect(p.yeast.pct).toBeCloseTo(0.0008, 9);
+  });
+
+  it('67°F is inside the book tolerance, 66°F is not', () => {
+    expect(planBatch({ ...base, riseF: 67 }).yeast.basis).toBe('book');
+    const p66 = planBatch({ ...base, riseF: 66 });
+    expect(p66.yeast.basis).toBe('estimate');
+    expect(p66.yeast.pct).toBeGreaterThan(0.0008);
+  });
+
+  it('a cooler rise scales the yeast up by the rate law and leaves the water alone', () => {
+    const p = planBatch({ ...base, riseF: 65 });
+    expect(p.yeast.basis).toBe('estimate');
+    expect(p.yeast.pct).toBeCloseTo(chooseYeast(overnight, { hours: 12, tempF: 65 }).pct, 12);
+    expect(p.yeast.pct).toBeGreaterThan(planBatch({ ...base, riseF: 66 }).yeast.pct);
+    expect(p.water).toEqual(planBatch(base).water);
+  });
+
+  it('both mode stepping down with a cool rise does not claim the book dose', () => {
+    const startAt = new Date('2026-11-08T03:35:00');
+    const p = planBatch({ ...base, timing: 'both', startAt, riseF: 62 });
+    expect(p.stageH).toBe(6);
+    expect(p.yeast.basis).toBe('estimate');
+    expect(p.fitNote).not.toContain("book's yeast");
+    expect(p.fitNote).toContain('rise temperature');
+  });
+});

@@ -101,7 +101,7 @@ export function BatchScreen({
 <section id={BATCH_TARGETS.recipe} tabIndex={-1} aria-label="Batch recipe">
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
       <p className="muted small">
-        Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${FLOUR_LABELS[p.flour]} flour` : ''}.
+        Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}{p.riseF !== undefined ? `, rise ${fmtTemp(p.riseF, unit)}` : ''},{p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${FLOUR_LABELS[p.flour]} flour` : ''}.
       </p>
       <button className="small" onClick={() => go({
         name: 'plan',

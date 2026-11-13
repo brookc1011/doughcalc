@@ -19,7 +19,13 @@ export interface PlanInput {
   formula: Formula;
   balls: BallGroup[];
   eatAt: Date;
+  /** Kitchen temperature at mixing. Sets the water temperature, and the yeast when riseF is blank. */
   roomF: number;
+  /**
+   * Average room temperature over the whole bulk rise (e.g. a house that cools overnight).
+   * Sets the yeast only; blank uses roomF.
+   */
+  riseF?: number;
   /** Hours of the yeast stage; defaults to the dough's book time (e.g. 12 h overnight bulk). */
   stageH?: number;
   warmUpH: number;
@@ -69,6 +75,7 @@ export function planBatch(raw: PlanInput): Plan {
   let input: PlanInput = raw;
   let window: Plan['window'];
   let fitNote: string | undefined;
+  let fitAnchor: Formula['anchors'][number] | undefined;
 
   if (timing !== 'eat' && raw.startAt) {
     const start = raw.startAt;
@@ -82,8 +89,7 @@ export function planBatch(raw: PlanInput): Plan {
           .sort((a, b) => b - a)
           .find(fits);
         if (shorter !== undefined) {
-          const a = f.anchors.find((x) => x.hours === shorter)!;
-          fitNote = `To fit your window, bulk is ${shorter} h with the book's yeast for that schedule (${a.source}).`;
+          fitAnchor = f.anchors.find((x) => x.hours === shorter)!;
           stageH = shorter;
         }
       }
@@ -95,9 +101,16 @@ export function planBatch(raw: PlanInput): Plan {
 
   const yeast = chooseYeast(
     f,
-    { hours: stageH, tempF: input.roomF },
+    { hours: stageH, tempF: input.riseF ?? input.roomF },
     { kitchenFactor: input.kitchenFactor, manualPct: input.manualYeastPct },
   );
+  if (fitAnchor) {
+    // Only claim the book's yeast when that is what was chosen (a cooler rise gives an estimate).
+    fitNote =
+      yeast.basis === 'book'
+        ? `To fit your window, bulk is ${stageH} h with the book's yeast for that schedule (${fitAnchor.source}).`
+        : `To fit your window, bulk is ${stageH} h. Yeast is scaled from ${fitAnchor.label} for your rise temperature.`;
+  }
   // A typed override is taken as the yeast you're using, so it isn't converted again.
   const recipe = computeRecipe({
     formula: f,

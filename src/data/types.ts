@@ -77,6 +77,8 @@ export interface PlannedSnapshot {
   yeastType?: YeastType;
   flour?: Flour;
   mixerMin?: number;
+  /** Average room temperature over the rise, when entered. °F. Optional, so no migration. */
+  riseF?: number;
 }
 
 /** What actually happened. Editable any time. */

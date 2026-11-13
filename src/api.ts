@@ -134,6 +134,8 @@ export interface PlanForm {
   balls: BallGroup[];
   eatAt: Date;
   roomF: number;
+  /** Average room temperature over the whole rise; blank uses roomF. Sets the yeast only. */
+  riseF?: number;
   stageH?: number;
   mixer: 'hand' | 'mixer';
   mixAt?: Date;
@@ -152,6 +154,7 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
     balls: form.balls,
     eatAt: form.eatAt,
     roomF: form.roomF,
+    riseF: form.riseF,
     stageH: form.stageH,
     warmUpH: s.warmUpH,
     mixAt: form.mixAt,
@@ -189,6 +192,7 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
       balls,
       eatAt: i.eatAt.toISOString(),
       roomF: i.roomF,
+      riseF: i.riseF,
       stageH: plan.stageH,
       warmUpH: i.warmUpH,
       mixer,

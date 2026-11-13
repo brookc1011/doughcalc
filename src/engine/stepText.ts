@@ -20,6 +20,8 @@
 //   says rising dough wants a tight-fitting cover; in its test a towel let the dough cool from 78°F to
 //   65°F, a bowl cover only to 74°F.
 // - Second fold about 30 min after the first: King Arthur (Maurizio Leo, "Mix and fold in bread dough").
+// - Active dry yeast: its 3 tbsp cup is warmed to 100-110°F (Fleischmann's Yeast 101); the book's
+//   mix water (90-95°F) is cooler than that. Instant keeps the book's wording.
 // - All-purpose flour: King Arthur ("Bread flour vs. all-purpose flour", 2022): use less water than with
 //   bread flour. No amount given, so the app gives none.
 
@@ -57,6 +59,10 @@ const temp = (w?: WaterTemp) => {
 };
 const find = (list: Ingredient[], key: Ingredient['key']) => list.find((i) => i.key === key);
 const yeastName = (y?: Ingredient) => (y?.name === 'Active dry yeast' ? 'active dry yeast' : 'instant yeast');
+/** Fleischmann's Yeast 101: dissolve active dry in 100-110°F water. Instant goes in as the book says. */
+export const ACTIVE_DRY_WATER = '100-110°F';
+export const ACTIVE_DRY_WATER_SOURCE = "Fleischmann's Yeast 101: dissolve active dry yeast in 100-110°F water";
+const isActiveDry = (y?: Ingredient) => y?.name === 'Active dry yeast';
 
 export function ballCut(balls: BallGroup[]): string {
   const live = balls.filter((b) => b.count > 0);
@@ -129,7 +135,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
   const y = find(t, 'yeast');
   return {
     autolyse:
-      `Measure ${g(find(t, 'water')?.grams ?? 0)} water at ${temp(a.water[0])}. Put ${yeastG(y?.grams ?? 0)} ${yeastName(y)} in a small cup with about 3 tbsp of that water and set it aside. ` +
+      `Measure ${g(find(t, 'water')?.grams ?? 0)} water at ${temp(a.water[0])}. Put ${yeastG(y?.grams ?? 0)} ${yeastName(y)} in a small cup with about 3 tbsp of that water${isActiveDry(y) ? ` warmed to ${ACTIVE_DRY_WATER} (active dry needs it warmer)` : ''} and set it aside. ` +
       `Pour the rest of the water over ${g(find(t, 'flour')?.grams ?? 0)} flour in a 12-qt tub${method === 'mixer' ? ' or the mixer bowl' : ''} and mix by hand just until there’s no dry flour. Cover and rest 20-30 min.${ap}`,
     mix: mixLine(
       method,
@@ -145,7 +151,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
       autolyse: [
         { name: 'Water', amount: `${g(find(t, 'water')?.grams ?? 0)} at ${temp(a.water[0])}` },
         { name: 'Flour', amount: g(find(t, 'flour')?.grams ?? 0) },
-        { name: cap(yeastName(y)), amount: `${yeastG(y?.grams ?? 0)}, in about 3 tbsp of the water` },
+        { name: cap(yeastName(y)), amount: `${yeastG(y?.grams ?? 0)}, in about 3 tbsp of the water${isActiveDry(y) ? ` warmed to ${ACTIVE_DRY_WATER}` : ''}` },
       ],
       mix: [
         { name: 'Salt', amount: g(find(t, 'salt')?.grams ?? 0) },
