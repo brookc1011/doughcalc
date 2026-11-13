@@ -106,6 +106,8 @@ General FWSY notes for both pizza and bread are in `docs/sources/fwsy-general.md
 
 Deferred: flatbreads/naan, starter charts, a permanent Starter tab, and one-Dutch-oven timing (a second oven session, the pot reheat, and a separate ready-to-slice time for each loaf; ChatGPT's bread round, 2026-11-13). The Preheat step text covers one pot in words until then.
 
+Next iteration (CJ, 2026-11-13): **round the loaf weight.** The Overnight White default shows 2 loaves x 901.4 g, which means weighing to the tenth of a gram. CJ wants the default loaf weight to be a round, easy-to-weigh number (905 g, or 900 or 910 g if that makes the ingredients rounder), with the ingredients scaled from it. To settle when building: whether to round only the bread default or every loaf and ball weight shown, which step to round to (5 g or 10 g), whether ingredient weights get rounded too (yeast and salt are small, so whole grams may matter), and how the screen marks the rounded weight as a change from the book weight, which comes from FWSY p.89.
+
 ## Verification (per phase)
 - `npm run guard`, `npm test` and `npm run build` all pass. Guard update in phases 1-3.
 - Pizza engine and api tests pass unmodified through phases 1-2. In phase 3, only the two reminder privacy tests (`tests/reminders.test.ts`, `tests/ui/helpCopy.test.ts`) change, and only to add the feeding item.
