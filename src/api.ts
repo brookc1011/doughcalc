@@ -3,7 +3,7 @@
 import { readyTally, suggestions, topSuggestion, type ReadyTally, type Suggestion, type Survey } from './engine/advice';
 import { googleCalendarLink, stepsToIcs } from './engine/calendar';
 import { rescaleBall, roundArea } from './engine/geometry';
-import { defaultStageH, planBatch, timingModes, type Plan, type TimingMode } from './engine/plan';
+import { coldOk, defaultStageH, planBatch, timingModes, type Plan, type TimingMode } from './engine/plan';
 import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
 import { productOf, type BallGroup, type DoughDefaults, type Formula, type Ingredient, type Product } from './engine/types';
@@ -149,7 +149,12 @@ export function ballForDiameter(refBallG: number, refDiameterIn: number, newDiam
   return rescaleBall(refBallG, roundArea(refDiameterIn), roundArea(newDiameterIn));
 }
 
-export { defaultStageH };
+export { coldOk, defaultStageH };
+
+export type Rise = 'room' | 'fridge';
+/** The rise path a batch was planned with. Batches from before the option are room rises. */
+export const riseOf = (b: Batch): Rise => (b.planned.coldBulk ? 'fridge' : 'room');
+export const RISE_LABELS: Record<Rise, string> = { room: 'Room rise', fridge: 'Fridge rise' };
 export { gapToNext, DEFAULT_MIXER_MIN, MIXER_MIN_SOURCE } from './engine/stepText';
 export type { Cover, StepIngredient, StepTimer } from './engine/stepText';
 
@@ -171,7 +176,7 @@ export interface PlanForm {
   yeastType?: YeastType;
   /** Flour picked on the form. All-purpose adds King Arthur's less-water note to the first step. */
   flour?: Flour;
-  /** Bread only: bulk in the fridge for 2-3 days. */
+  /** Fridge rise: bread 2-3 days; straight pizza doughs, Ooni's 24-72 h. */
   coldBulk?: boolean;
 }
 
@@ -237,7 +242,7 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
       mixerMin: i.mixerMin,
       yeastType: i.yeastType ?? 'instant',
       flour,
-      ...(i.coldBulk && bread ? { coldBulk: true } : {}),
+      ...(plan.coldBulk ? { coldBulk: true } : {}),
     }),
     actual: {},
     sessions: [],
@@ -529,13 +534,15 @@ export async function timingTally(): Promise<ReadyTally> {
 
 /** History summary per dough: bakes, average overall score, best batch. */
 export async function doughHistory(): Promise<
-  { doughId: string; name: string; bakes: number; avgOverall?: number; bestBatchId?: string; scores: number[] }[]
+  { key: string; doughId: string; rise: Rise; name: string; bakes: number; avgOverall?: number; bestBatchId?: string; scores: number[] }[]
 > {
+  // One row per dough and rise path: the same dough made on the counter or in the fridge is compared apart.
   const batches = (await store.listBatches()).slice().reverse(); // oldest first for trend lines
-  const by = new Map<string, { name: string; scores: number[]; best?: { id: string; score: number }; bakes: number }>();
+  const by = new Map<string, { doughId: string; rise: Rise; name: string; scores: number[]; best?: { id: string; score: number }; bakes: number }>();
   for (const b of batches) {
-    const key = b.planned.formula.id;
-    const row = by.get(key) ?? { name: b.planned.formula.name, scores: [], bakes: 0 };
+    const rise = riseOf(b);
+    const key = `${b.planned.formula.id}:${rise}`;
+    const row = by.get(key) ?? { doughId: b.planned.formula.id, rise, name: b.planned.formula.name, scores: [], bakes: 0 };
     for (const s of b.sessions) {
       row.bakes += 1;
       if (s.survey.overall) {
@@ -545,8 +552,10 @@ export async function doughHistory(): Promise<
     }
     by.set(key, row);
   }
-  return [...by.entries()].map(([doughId, r]) => ({
-    doughId,
+  return [...by.entries()].map(([key, r]) => ({
+    key,
+    doughId: r.doughId,
+    rise: r.rise,
     name: r.name,
     bakes: r.bakes,
     scores: r.scores,

@@ -48,3 +48,33 @@ https://www.breadbakingathome.com/post/retarding-the-dough-why-what-and-how
 2. **The order the sources support for 2-3 days is cold bulk:** mix, folds (about 1½ h), the tub straight into the fridge for 2-3 days, out to warm up (30 minutes per BBAH, 40-60 per King Arthur, about 2 hours before baking per Reinhart), divide and shape, a room proof checked with the finger-dent test, then bake. This also matches what CJ described first ("folds ... 2-3 day bulk ferment, then out to rest and shape").
 3. **Yeast:** no source gives a dose for 2-3 days cold. Options: keep the book's 0.8 g and label it as an assumption, or get the figure from Reinhart's book if CJ has it.
 4. **Warm-up and proof after the fridge:** the sources range from 30 minutes to about 2 hours. It would go in as an editable setting labeled as an assumption, and the finger-dent test decides.
+
+# Pizza fridge rise (research notes and CJ's decision, 2026-11-20)
+
+CJ asked for a 2-3 day fridge rise for pizza, chosen per bake on the Plan screen (not a dough setting), with the
+rise path recorded on each batch so ratings can compare the same dough made both ways.
+
+**CJ's decision (2026-11-20), now in the code:** Ooni's order and figures. Mix as the dough's own method, the fold,
+the tub straight into the fridge 24-72 h (default 48 h, the start of CJ's 2-3 days; editable), out to divide and
+ball, 5 h on the counter, bake. Yeast is Ooni's dose, used as is. Straight pizza doughs only (Ooni's is a straight
+dough); poolish doughs keep the room rise. CJ notes Forkish also bulks in the tub before balling, and his overnight
+dough's 2-day ball hold comes after a 1-day bulk, so about 3 days in all.
+
+### Ooni, "Cold-proof pizza dough" (no author or date shown; read 2026-11-20)
+https://ooni.com/blogs/recipes/cold-prove-pizza-dough
+- 607 g "00" flour, 368 g water (cold), 18 g fine sea salt, 1.4 g instant dried yeast (or 1.6 g active dried, 4.1 g fresh). No oil, no sugar.
+- Mixed, covered and into the fridge as one mass. No room rise before the fridge is stated.
+- Fridge 24-72 hours (method). The intro says 24-96 hours, and 3-5 days as the longest.
+- Out when roughly doubled; divide into 3 or 4, shape into balls, leave on the counter 5 hours to come to room temperature and double in size, then stretch.
+- Oven 750-850°F; bake time left to the topping recipe.
+
+### King Arthur, "Now or Later Pizza Crust" (PJ Hamel, updated 2026-01-26)
+https://www.kingarthurbaking.com/recipes/now-or-later-pizza-crust-recipe
+- 45 min covered rise, then the fridge 4 hours, up to 36 hours, as one mass; divided after. Rest about 30 min while the oven heats to 450°F.
+- Only up to 36 h, so not used for the 2-3 day option.
+
+### Forkish, FWSY (already in `fwsy-general.md`)
+- Pizza balls rest in the fridge "from several hours to a couple of days" after a room bulk. Straight doughs keep 2-3 days.
+
+### Not read
+- Serious Eats, Kenji López-Alt NY-style dough: the page would not load for the fetch tool.

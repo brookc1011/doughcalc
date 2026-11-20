@@ -1,5 +1,5 @@
 import { buildBreadSchedule, COLD_BULK_MAX_H, COLD_BULK_MIN_H, COLD_WARM_UP_MIN, foldCount, foldKey, lastFoldMin } from './bread/schedule';
-import { buildSchedule, type Schedule, type Step } from './schedule';
+import { buildSchedule, PIZZA_COLD_MAX_H, PIZZA_COLD_MIN_H, PIZZA_COLD_REST_H, pizzaColdOk, type Schedule, type Step } from './schedule';
 import type { MixMethod } from './methods';
 import type { StepAmounts } from './stepText';
 import { productOf, type Formula } from './types';
@@ -22,7 +22,7 @@ export interface ProgressInput {
   preheatMin?: number;
   /** Batches locked from stepVersion 3 on: their amounts, for the full step text. */
   amounts?: StepAmounts;
-  /** Bread fridge option: stageH is the planned fridge hours. */
+  /** Fridge rise (bread, or a straight pizza dough): stageH is the planned fridge hours. */
   coldBulk?: boolean;
 }
 
@@ -59,6 +59,8 @@ export function replan(input: ProgressInput, done: Record<string, Date>): Progre
   else if (done.autolyse) mixAt = new Date(done.autolyse.getTime() + p.autolyseMin * M);
   else if (done.poolish) mixAt = new Date(done.poolish.getTime() + stageH * H);
 
+  if (input.coldBulk && pizzaColdOk(f)) return replanPizzaCold(input, done, mixAt);
+
   const base = { formula: f, stageH, warmUpH, mixAt, ballAt: done.ball, mixer: input.mixer, preheatMin: input.preheatMin, amounts: input.amounts };
   let eatAt = input.eatAt;
   let sch = buildSchedule({ ...base, eatAt });
@@ -73,6 +75,36 @@ export function replan(input: ProgressInput, done: Record<string, Date>): Progre
   }
 
   return withDone(sch, done, eatAt, movedTo);
+}
+
+/**
+ * Pizza fridge rise (Ooni): the fridge window (24-72 h from the fold) absorbs a late or early mix or fold,
+ * so the tub comes out at the planned time while it is inside the window; outside it, the take-out time
+ * moves to the nearest end. The balls then get Ooni's 5 h on the counter, so dinner follows the balling
+ * time, earlier or later.
+ */
+function replanPizzaCold(input: ProgressInput, done: Record<string, Date>, mixAt: Date): Progress {
+  const f = input.formula;
+  const fridgeIn = done.fold ?? new Date(mixAt.getTime() + f.process.foldAfterMin * M);
+  const planned = input.eatAt.getTime() - PIZZA_COLD_REST_H * H;
+  const t = Math.min(Math.max(planned, fridgeIn.getTime() + PIZZA_COLD_MIN_H * H), fridgeIn.getTime() + PIZZA_COLD_MAX_H * H);
+  const ballAt = done.ball ?? new Date(t);
+  const eatAt = new Date(ballAt.getTime() + PIZZA_COLD_REST_H * H);
+  // Mix is pinned; the fold may have been late or early, so the schedule's fold follows the checked time.
+  const sch = buildSchedule({
+    formula: f,
+    stageH: input.stageH,
+    warmUpH: input.warmUpH,
+    eatAt,
+    mixAt,
+    ballAt,
+    mixer: input.mixer,
+    preheatMin: input.preheatMin,
+    amounts: input.amounts,
+    coldBulk: true,
+  });
+  const moved = Math.abs(eatAt.getTime() - input.eatAt.getTime()) > 1000;
+  return withDone(sch, done, eatAt, moved ? eatAt : undefined);
 }
 
 /**

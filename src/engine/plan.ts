@@ -2,7 +2,19 @@ import { computeRecipe, type Recipe, type YeastType } from './formula';
 import type { MixMethod } from './methods';
 import { getPreset } from './presets';
 import { buildBreadSchedule, COLD_BULK_DEFAULT_H, COLD_BULK_MAX_H, COLD_BULK_MIN_H, mixToBakeH } from './bread/schedule';
-import { buildSchedule, eatWindow, type Schedule } from './schedule';
+import {
+  buildSchedule,
+  eatWindow,
+  OONI_FLOUR_G,
+  OONI_SOURCE,
+  OONI_YEAST_G,
+  PIZZA_COLD_DEFAULT_H,
+  PIZZA_COLD_MAX_H,
+  PIZZA_COLD_MIN_H,
+  PIZZA_COLD_REST_H,
+  pizzaColdOk,
+  type Schedule,
+} from './schedule';
 import { waterTemps, type TempSettings, type WaterTemp } from './temperature';
 import { productOf, type BallGroup, type Formula, type YeastResult } from './types';
 import { chooseYeast } from './yeast';
@@ -47,7 +59,10 @@ export interface PlanInput {
   /** All-purpose flour chosen: adds King Arthur's less-water note to the first step. */
   apFlour?: boolean;
   yeastType?: YeastType;
-  /** Bread only: bulk in the fridge for 2-3 days; stageH is then the fridge hours. */
+  /**
+   * Fridge rise; stageH is then the fridge hours. Bread: bulk in the fridge 2-3 days (book yeast, an
+   * assumption). Straight pizza doughs: Ooni's cold-proof method and yeast. Ignored for poolish pizza.
+   */
   coldBulk?: boolean;
 }
 
@@ -65,15 +80,24 @@ export interface Plan {
   fitNote?: string;
   /** Everything that blocks locking in. */
   errors: string[];
+  /** The rise path this plan uses: true when it is the fridge rise. */
+  coldBulk: boolean;
+}
+
+/** Whether a dough offers the fridge rise: all bread, and straight pizza doughs. */
+export function coldOk(f: Formula): boolean {
+  return productOf(f) === 'bread' || pizzaColdOk(f);
 }
 
 /** Timing modes a dough offers. Bread (room proof, no hold) has no slack for "both". */
-export function timingModes(f: Formula): TimingMode[] {
-  return productOf(f) === 'bread' ? ['eat', 'start'] : ['eat', 'start', 'both'];
+export function timingModes(f: Formula, coldBulk = false): TimingMode[] {
+  // The pizza fridge rise has a fixed counter rest after the fridge, so no "both" either.
+  return productOf(f) === 'bread' || (coldBulk && coldOk(f)) ? ['eat', 'start'] : ['eat', 'start', 'both'];
 }
 
 export function defaultStageH(f: Formula, coldBulk = false): number {
   if (coldBulk && productOf(f) === 'bread') return COLD_BULK_DEFAULT_H;
+  if (coldBulk && pizzaColdOk(f)) return PIZZA_COLD_DEFAULT_H;
   // A dough with no yeast anchors (a future levain dough) needs its own stageH; 0 means "not set".
   return f.process.stageH ?? getPreset(f.id)?.process.stageH ?? f.anchors[f.anchors.length - 1]?.hours ?? 0;
 }
@@ -83,7 +107,8 @@ export function planBatch(raw: PlanInput): Plan {
   const timing = raw.startAt ? (raw.timing ?? 'eat') : 'eat';
   const bread = productOf(f) === 'bread';
   const cold = bread && !!raw.coldBulk;
-  let stageH = raw.stageH ?? defaultStageH(f, cold);
+  const pizzaCold = !bread && !!raw.coldBulk && pizzaColdOk(f);
+  let stageH = raw.stageH ?? defaultStageH(f, cold || pizzaCold);
   let input: PlanInput = raw;
   let window: Plan['window'];
   let fitNote: string | undefined;
@@ -93,6 +118,12 @@ export function planBatch(raw: PlanInput): Plan {
     // Bread: start at the autolyse; the loaves go in as soon as the proof is done (no hold).
     const mixAt = new Date(raw.startAt.getTime() + f.process.autolyseMin * 60_000);
     const bakeAt = new Date(mixAt.getTime() + mixToBakeH(f, stageH, cold) * 3600_000);
+    window = { earliest: bakeAt, latest: bakeAt };
+    input = { ...raw, mixAt, eatAt: timing === 'start' ? bakeAt : raw.eatAt };
+  } else if (pizzaCold && timing !== 'eat' && raw.startAt) {
+    // Pizza fridge rise: start at the autolyse; bake after the fridge time and Ooni's 5 h counter rest.
+    const mixAt = new Date(raw.startAt.getTime() + f.process.autolyseMin * 60_000);
+    const bakeAt = new Date(mixAt.getTime() + (f.process.foldAfterMin / 60 + stageH + PIZZA_COLD_REST_H) * 3600_000);
     window = { earliest: bakeAt, latest: bakeAt };
     input = { ...raw, mixAt, eatAt: timing === 'start' ? bakeAt : raw.eatAt };
   } else if (timing !== 'eat' && raw.startAt) {
@@ -128,6 +159,15 @@ export function planBatch(raw: PlanInput): Plan {
       note: `${yeast.note} Assumption: this is the book's dose for a room-temperature overnight rise; no source gives one for 2-3 days in the fridge.`,
     };
   }
+  if (pizzaCold && input.manualYeastPct === undefined) {
+    // Ooni's own dose for its cold-proof dough, used as is: the rate law is not applied to a fridge rise,
+    // and the kitchen adjustment is for the counter, not the fridge.
+    yeast = {
+      pct: OONI_YEAST_G / OONI_FLOUR_G,
+      basis: 'book',
+      note: `${OONI_SOURCE}. Ooni's dose for its own dough, used for this one as is.`,
+    };
+  }
   if (fitAnchor) {
     // Only claim the book's yeast when that is what was chosen (a cooler rise gives an estimate).
     fitNote =
@@ -148,6 +188,7 @@ export function planBatch(raw: PlanInput): Plan {
   const schedule = bread
     ? buildBreadSchedule({ formula: f, eatAt: input.eatAt, stageH, mixAt: input.mixAt, amounts, coldBulk: cold })
     : buildSchedule({
+    coldBulk: pizzaCold,
     formula: f,
     eatAt: input.eatAt,
     stageH,
@@ -160,11 +201,15 @@ export function planBatch(raw: PlanInput): Plan {
 
   const errors = [...recipe.errors, ...schedule.errors];
   if (input.balls.every((b) => b.count <= 0)) errors.push(bread ? 'Add at least one loaf.' : 'Add at least one dough ball.');
+  if (pizzaCold && timing === 'both') errors.push('The fridge rise has a set counter rest after the fridge, so pick a start time or a bake time, not both.');
+  if (pizzaCold && (stageH < PIZZA_COLD_MIN_H || stageH > PIZZA_COLD_MAX_H)) {
+    errors.push(`Fridge time is ${PIZZA_COLD_MIN_H}-${PIZZA_COLD_MAX_H} hours (Ooni).`);
+  }
   if (bread && timing === 'both') errors.push('Bread proofs at room temperature with no hold, so pick a start time or a bake time, not both.');
   if (cold && (stageH < COLD_BULK_MIN_H || stageH > COLD_BULK_MAX_H)) {
     errors.push(`Fridge time is 2-3 days: ${COLD_BULK_MIN_H}-${COLD_BULK_MAX_H} hours.`);
   }
   if (yeast.basis === 'manual' && yeast.pct <= 0) errors.push(yeast.warning ?? 'Enter a yeast amount.');
 
-  return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors };
+  return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors, coldBulk: cold || pizzaCold };
 }

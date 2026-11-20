@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { productOf, type Product, doughHistory, flourHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
+import { productOf, riseOf, RISE_LABELS, type Product, type Rise, doughHistory, flourHistory, fmtWhen, listBatches, timingTally, type Batch, type ReadyTally, type Settings } from '../api';
 import type { Route } from './App';
 import { Chips, KitchenMark } from './common';
 
@@ -20,9 +20,12 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
   }, []);
 
   const [filter, setFilter] = useState<Product | 'all'>('all');
-  const visible = batches.filter(b => filter === 'all' || productOf(b.planned.formula) === filter);
-  const doughIds = new Set(visible.map(b => b.planned.formula.id));
-  const trends = hist.filter(h => doughIds.has(h.doughId));
+  const [rise, setRise] = useState<Rise | 'all'>('all');
+  const visible = batches.filter(b => (filter === 'all' || productOf(b.planned.formula) === filter) && (rise === 'all' || riseOf(b) === rise));
+  const rowKeys = new Set(visible.map(b => `${b.planned.formula.id}:${riseOf(b)}`));
+  const trends = hist.filter(h => rowKeys.has(h.key));
+  // Only worth a filter once there is a fridge-rise batch to compare against.
+  const hasFridge = batches.some(b => riseOf(b) === 'fridge');
   const latestTry = visible.find((b) => b.nextTry)?.nextTry;
 
   return (
@@ -30,6 +33,9 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
       <p className="eyebrow">Your bake notebook</p><h1>Bakes</h1><p className="intro">A little better with every bake.</p>
 
       <Chips value={filter} onChange={setFilter} options={[{ v: 'all', label: 'All' }, { v: 'pizza', label: 'Pizza' }, { v: 'bread', label: 'Bread' }]} />
+      {hasFridge && (
+        <Chips value={rise} onChange={setRise} options={[{ v: 'all', label: 'Any rise' }, { v: 'room', label: 'Room' }, { v: 'fridge', label: 'Fridge' }]} />
+      )}
 
       {latestTry && (
         <section className="card highlight">
@@ -42,9 +48,9 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
         <section className="card">
           <h2>By dough</h2>
           {trends.map((h) => (
-            <div key={h.doughId} className="session">
+            <div key={h.key} className="session">
               <div className="row between">
-                <b>{h.name}</b>
+                <b>{h.name}{hasFridge && <span className="muted small"> · {RISE_LABELS[h.rise]}</span>}</b>
                 <span className="score">{h.avgOverall ? `${h.avgOverall.toFixed(1)}/5 avg` : ''}</span>
               </div>
               <div className="muted small">
@@ -102,7 +108,7 @@ export function HistoryScreen({ settings, go }: { settings: Settings; go: (r: Ro
                 <b>{b.title}</b>
                 <span>{scores.length ? `${scores.join(', ')}/5` : 'not rated'}</span>
               </div>
-              <div className="muted small">{productOf(b.planned.formula) === 'bread' ? 'Bread' : 'Pizza'} · {fmtWhen(b.planned.eatAt)}</div>
+              <div className="muted small">{productOf(b.planned.formula) === 'bread' ? 'Bread' : 'Pizza'} · {RISE_LABELS[riseOf(b)]} · {fmtWhen(b.planned.eatAt)}</div>
             </button>
           );
         })}

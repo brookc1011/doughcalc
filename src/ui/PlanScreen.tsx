@@ -2,7 +2,7 @@ import { defaultStart, READY_WINDOW_SOURCE, TIMING_HINTS } from './presentation'
 import { FLOUR_SOURCES, HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  allDoughs, lastDoughId, timingModes, type Product,
+  allDoughs, coldOk, lastDoughId, timingModes, type Product,
   ballForDiameter,
   cloneDough,
   DEFAULT_EAT_HOUR,
@@ -72,7 +72,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   const [useSnapshot, setUseSnapshot] = useState(!!repeat);
   const [details, setDetails] = useState(false);
   const [stageH, setStageH] = useState<number | undefined>();
-  const [coldBulk, setColdBulk] = useState(!!(bread && (repeat?.coldBulk ?? repeat?.formula.defaults?.coldBulk)));
+  const [coldBulk, setColdBulk] = useState(!!(repeat?.coldBulk ?? (bread && repeat?.formula.defaults?.coldBulk)));
   const [manualYeast, setManualYeast] = useState('');
   const [edits, setEdits] = useState<{ hydration?: number; salt?: number }>({});
   const [saving, setSaving] = useState(false);
@@ -83,7 +83,8 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
     setDoughId(f.id);
     setBalls(defaultBalls(f));
     // In Start or Both mode the times you typed stay put when you switch dough.
-    const cold = bread && !!f.defaults?.coldBulk;
+    // Bread keeps the fridge choice in its saved defaults; pizza keeps the toggle per bake (CJ, 2026-11-20).
+    const cold = bread ? !!f.defaults?.coldBulk : coldBulk && coldOk(f);
     const bake = tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR, f.defaults?.eatMinute ?? 0);
     if (timing === 'eat') setEatAt(toLocalInput(cold ? fridgeBake(bake) : bake));
     setMixer(bread ? 'hand' : f.defaults?.mixer ?? settings.mixer);
@@ -130,7 +131,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
         yeastType,
         flour: flour || undefined,
-        coldBulk: bread && coldBulk,
+        coldBulk: coldBulk && coldOk(f),
       },
       settings,
     );
@@ -195,7 +196,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
     }
   };
 
-  const cold = bread && coldBulk;
+  const cold = coldBulk && coldOk(formula);
   const stageLabel = formula.family === 'poolish' ? 'Poolish ripening (hours)' : cold ? 'Fridge time (hours)' : 'Bulk ferment (hours)';
 
   return (
@@ -257,18 +258,19 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         </div>
 
         </details>}
-        {bread && <fieldset className="timing-group">
+        {coldOk(formula) && <fieldset className="timing-group">
           <legend className="sr-only">Rise</legend>
           <div className="timing-help">
             <span>Rise</span>
-            <Info label="rise">Room: the book's overnight rise on the counter. Fridge: after the folds the tub goes into the fridge for 2-3 days, then out to warm up, shape and proof. The yeast stays at the book's amount, which is an assumption for the fridge: no source gives one.</Info>
+            <Info label="rise">{bread ? <>Room: the book's overnight rise on the counter. Fridge: after the folds the tub goes into the fridge for 2-3 days, then out to warm up, shape and proof. The yeast stays at the book's amount, which is an assumption for the fridge: no source gives one.</> : <>Room: the dough's own rise on the counter. Fridge (Ooni's cold-proof method): after the fold the tub goes into the fridge for 24-72 hours, then you divide and ball, and the balls rest about 5 hours on the counter before baking. The yeast is Ooni's amount for its own cold-proof dough.</>}</Info>
           </div>
           <Chips value={coldBulk ? 'fridge' : 'room'} options={[{ v: 'room', label: 'Room' }, { v: 'fridge', label: 'Fridge' }]} onChange={(v) => {
             setColdBulk(v === 'fridge');
             setStageH(undefined);
+            if (v === 'fridge' && timing === 'both') setTiming('eat');
             if (v === 'fridge' && timing === 'eat') setEatAt(toLocalInput(fridgeBake(new Date(eatAt))));
           }} />
-          <p className="timing-hint">{coldBulk ? 'Tub in the fridge 2-3 days after the folds.' : 'Overnight on the counter, as in the book.'}</p>
+          <p className="timing-hint">{bread ? (coldBulk ? 'Tub in the fridge 2-3 days after the folds.' : 'Overnight on the counter, as in the book.') : coldBulk ? 'Tub in the fridge 1-3 days, then ball (Ooni).' : 'On the counter, as the dough is written.'}</p>
         </fieldset>}
         <fieldset className="timing-group">
         <legend className="sr-only">Plan around</legend>
@@ -276,7 +278,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
           <span>Plan around</span>
           <Info label="planning times">{bread ? 'Bake at is when the loaves go in the oven. Start at works forward from the first step.' : HELP_COPY['planning times']}</Info>
         </div>
-        <Chips value={timing} options={TIMING_OPTIONS.filter(o => timingModes(formula).includes(o.v))} onChange={setTiming} />
+        <Chips value={timing} options={TIMING_OPTIONS.filter(o => timingModes(formula, cold).includes(o.v))} onChange={setTiming} />
         <p className="timing-hint">{TIMING_HINTS[timing]}</p>
         {timing !== 'eat' && (
           <label>
@@ -401,7 +403,8 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
               <Info label="ferment time">
                 {formula.family === 'poolish'
                   ? 'How long the poolish sits out before the final mix.'
-                  : cold ? 'Hours the tub stays in the fridge, 48-72 (2-3 days). The yeast does not change with it.'
+                  : cold && bread ? 'Hours the tub stays in the fridge, 48-72 (2-3 days). The yeast does not change with it.'
+                  : cold ? 'Hours the tub stays in the fridge after the fold, 24-72 (Ooni). The yeast does not change with it.'
                   : bread ? 'Time from mixing to shaping the loaves.' : 'Time from mixing to dividing into balls.'}{' '}
                 {!cold && 'The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.'}
               </Info>

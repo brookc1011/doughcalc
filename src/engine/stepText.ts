@@ -98,6 +98,10 @@ export interface FullText {
   ball: string;
   fridge: string;
   pull: (warmUpH: number) => string;
+  /** Pizza fridge rise (Ooni): the fold, then the tub into the fridge. */
+  foldCold: string;
+  /** Pizza fridge rise (Ooni): out of the fridge, divide, ball, 5 h on the counter. */
+  ballCold: string;
   /** What goes in at each step, for a quick look while working. */
   ingredients: Partial<Record<'poolish' | 'autolyse' | 'mix' | 'ball', StepIngredient[]>>;
 }
@@ -113,6 +117,15 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
     'Shape each gently into a medium-tight round without pressing the air out: fold the edges into the center, turn and repeat, then pinch the seam and set it seam side down. No cover needed while you shape.';
   const fridge = 'On a lightly floured baking sheet with room between them. Lightly oil or flour the tops, cover with plastic wrap, and into the fridge.';
   const pull = (h: number) => `Leave them covered at room temperature, about ${h} h, until they stretch easily.`;
+  // Pizza fridge rise: Ooni, "Cold-proof pizza dough" (docs/sources/cold-proof.md).
+  const foldCold = fold.replace(
+    'It’s ready to divide at 2-3 times its starting size.',
+    'Then put the tub straight into the fridge (Ooni: the dough goes in as one mass). It comes out when it has roughly doubled.',
+  );
+  const ballCold =
+    'Take the tub out of the fridge; Ooni takes it out when the dough has roughly doubled. ' +
+    ball.replace(/ No cover needed while you shape\.$/, '') +
+    ` Set them on a lightly floured tray with room between them, cover, and leave on the counter about ${PIZZA_COLD_REST_H} h, until they come to room temperature and double in size (Ooni).`;
 
   const pieces = { name: 'Dough balls', amount: ballCut(a.balls) };
   const ap = a.apFlour ? ' All-purpose flour: King Arthur says to use less water than with bread flour, but gives no amount; hydration is in Details.' : '';
@@ -133,6 +146,8 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
       ball,
       fridge,
       pull,
+      foldCold,
+      ballCold,
       ingredients: {
         poolish: [
           { name: 'Flour', amount: g(find(pp.ingredients, 'flour')?.grams ?? 0) },
@@ -167,6 +182,8 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
     ball,
     fridge,
     pull,
+    foldCold,
+    ballCold,
     ingredients: {
       autolyse: [
         { name: 'Water', amount: `${g(find(t, 'water')?.grams ?? 0)} at ${temp(a.water[0])}` },
@@ -182,6 +199,9 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
     },
   };
 }
+
+/** Ooni, "Cold-proof pizza dough": the balls rest 5 h on the counter after the fridge. */
+export const PIZZA_COLD_REST_H = 5;
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 

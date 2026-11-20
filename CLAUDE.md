@@ -26,7 +26,7 @@ Personal pizza dough calculator and bake log for CJ (not LoanStar work). Install
 
 ## Data rules
 - Never invent a figure. Every number in presets or advice has a named source in the code (Forkish *Flour Water Salt Yeast* page numbers as "FWSY p.N", King Arthur, PizzaBlab, PizzaOvenCalc). If no source exists, say so and make it an editable setting labeled as an assumption.
-- Yeast: the book dose wins when the schedule matches a book anchor; between anchors the PizzaOvenCalc rate law scales from the nearest anchor and is labeled "estimate". Cold bulk is not modeled, with one exception: the bread fridge option (2-3 days, CJ 2026-11-20, `docs/sources/cold-proof.md`) keeps the book dose, labeled as an assumption, and never scales it. Fridge hold after balling never changes yeast.
+- Yeast: the book dose wins when the schedule matches a book anchor; between anchors the PizzaOvenCalc rate law scales from the nearest anchor and is labeled "estimate". Cold bulk is not modeled, with two exceptions. The bread fridge option (2-3 days, CJ 2026-11-20, `docs/sources/cold-proof.md`) keeps the book dose, labeled as an assumption, and never scales it. The pizza fridge rise (straight doughs, chosen per bake) uses Ooni's cold-proof method and dose as is (24-72 h, 5 h counter rest; same file). Fridge hold after balling never changes yeast.
 - Advice is direction only, timing first, oven before dough. No auto-learned multipliers; the kitchen factor is set by CJ.
 - Locked batches are immutable plans plus an editable "actual" layer. Any schema change gets a new `if (oldVersion < N)` migration in `src/data/store.ts`; never edit an old one. Bake data lives only on the phone, so a broken migration loses history.
 
