@@ -1,4 +1,4 @@
-import { buildBreadSchedule } from './bread/schedule';
+import { buildBreadSchedule, COLD_BULK_MAX_H, COLD_BULK_MIN_H, COLD_WARM_UP_MIN, foldCount, foldKey, lastFoldMin } from './bread/schedule';
 import { buildSchedule, type Schedule, type Step } from './schedule';
 import type { MixMethod } from './methods';
 import type { StepAmounts } from './stepText';
@@ -22,6 +22,8 @@ export interface ProgressInput {
   preheatMin?: number;
   /** Batches locked from stepVersion 3 on: their amounts, for the full step text. */
   amounts?: StepAmounts;
+  /** Bread fridge option: stageH is the planned fridge hours. */
+  coldBulk?: boolean;
 }
 
 export interface ProgressStep extends Step {
@@ -74,6 +76,10 @@ export function replan(input: ProgressInput, done: Record<string, Date>): Progre
 }
 
 /**
+ * Bread fridge option: the fridge window (2-3 days) absorbs a late or early mix or fold, so the tub comes out
+ * at the planned time while it has had at least the minimum and at most the maximum fridge time. Outside
+ * that, the take-out time (and so the bake) moves to the nearest end of the window. After shaping, as below.
+ *
  * Bread: the room proof has no hold (FWSY p.89: "15 minutes can make a difference"), so the loaves go in
  * when the proof is done. Later steps keep the book gaps from what was checked off, and the bake moves,
  * earlier or later, with the actual shaping time.
@@ -83,11 +89,21 @@ function replanBread(input: ProgressInput, done: Record<string, Date>): Progress
   let mixAt = input.plannedMixAt;
   if (done.mix) mixAt = done.mix;
   else if (done.autolyse) mixAt = new Date(done.autolyse.getTime() + f.process.autolyseMin * M);
+  let pullAt: Date | undefined;
+  if (input.coldBulk) {
+    const last = foldKey(foldCount(f) - 1);
+    const fridgeIn = done[last] ?? new Date(mixAt.getTime() + lastFoldMin(f) * M);
+    const planned = input.eatAt.getTime() - (f.process.minProofH * H + COLD_WARM_UP_MIN * M);
+    const t = Math.min(Math.max(planned, fridgeIn.getTime() + COLD_BULK_MIN_H * H), fridgeIn.getTime() + COLD_BULK_MAX_H * H);
+    pullAt = done.pull ?? new Date(t);
+  }
   const sch = buildBreadSchedule({
     formula: f,
     eatAt: input.eatAt,
     stageH,
     mixAt,
+    coldBulk: input.coldBulk,
+    pullAt,
     shapeAt: done.shape,
     bakeAt: done.bake,
     lidOffAt: done.lidOff,

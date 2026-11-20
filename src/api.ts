@@ -171,6 +171,8 @@ export interface PlanForm {
   yeastType?: YeastType;
   /** Flour picked on the form. All-purpose adds King Arthur's less-water note to the first step. */
   flour?: Flour;
+  /** Bread only: bulk in the fridge for 2-3 days. */
+  coldBulk?: boolean;
 }
 
 export function makePlan(form: PlanForm, s: Settings): Plan {
@@ -192,6 +194,7 @@ export function makePlan(form: PlanForm, s: Settings): Plan {
     mixerMin: s.mixerMin,
     apFlour: (form.flour ?? s.flour) === 'ap',
     yeastType: form.yeastType ?? s.yeastType,
+    coldBulk: form.coldBulk,
     temp: {
       bandLowF: s.bandLowF,
       bandHighF: s.bandHighF,
@@ -234,6 +237,7 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
       mixerMin: i.mixerMin,
       yeastType: i.yeastType ?? 'instant',
       flour,
+      ...(i.coldBulk && bread ? { coldBulk: true } : {}),
     }),
     actual: {},
     sessions: [],
@@ -271,6 +275,7 @@ export function batchProgress(b: Batch): Progress {
       warmUpH: p.warmUpH,
       eatAt: new Date(p.eatAt),
       plannedMixAt: new Date(mix?.at ?? p.eatAt),
+      coldBulk: p.coldBulk,
       // Older batches keep the steps they were planned with: by-hand text, no preheat.
       mixer: p.stepVersion ? p.mixer : 'hand',
       preheatMin: p.stepVersion ? p.preheatMin : undefined,

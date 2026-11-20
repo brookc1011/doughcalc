@@ -94,6 +94,8 @@ export interface DoughDefaults {
   /** Minutes past eatHour (bread: the book's sample bake is 9:15 a.m.). Missing: on the hour. */
   eatMinute?: number;
   mixer?: 'hand' | 'mixer';
+  /** Bread: start this dough with the fridge option (2-3 days cold bulk). */
+  coldBulk?: boolean;
 }
 
 export interface BallGroup {

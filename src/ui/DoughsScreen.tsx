@@ -222,7 +222,7 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
           <div className="row ball" key={i}>
             <NumField value={b.count} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} onValue={(n) => setBall(i, { count: n })} />
             <span>×</span>
-            <NumField value={b.grams} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} onValue={(n) => setBall(i, { grams: n })} />
+            <NumField whole value={b.grams} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} onValue={(n) => setBall(i, { grams: n })} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>

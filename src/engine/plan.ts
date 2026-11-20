@@ -1,7 +1,7 @@
 import { computeRecipe, type Recipe, type YeastType } from './formula';
 import type { MixMethod } from './methods';
 import { getPreset } from './presets';
-import { buildBreadSchedule, mixToBakeH } from './bread/schedule';
+import { buildBreadSchedule, COLD_BULK_DEFAULT_H, COLD_BULK_MAX_H, COLD_BULK_MIN_H, mixToBakeH } from './bread/schedule';
 import { buildSchedule, eatWindow, type Schedule } from './schedule';
 import { waterTemps, type TempSettings, type WaterTemp } from './temperature';
 import { productOf, type BallGroup, type Formula, type YeastResult } from './types';
@@ -47,6 +47,8 @@ export interface PlanInput {
   /** All-purpose flour chosen: adds King Arthur's less-water note to the first step. */
   apFlour?: boolean;
   yeastType?: YeastType;
+  /** Bread only: bulk in the fridge for 2-3 days; stageH is then the fridge hours. */
+  coldBulk?: boolean;
 }
 
 export interface Plan {
@@ -70,7 +72,8 @@ export function timingModes(f: Formula): TimingMode[] {
   return productOf(f) === 'bread' ? ['eat', 'start'] : ['eat', 'start', 'both'];
 }
 
-export function defaultStageH(f: Formula): number {
+export function defaultStageH(f: Formula, coldBulk = false): number {
+  if (coldBulk && productOf(f) === 'bread') return COLD_BULK_DEFAULT_H;
   // A dough with no yeast anchors (a future levain dough) needs its own stageH; 0 means "not set".
   return f.process.stageH ?? getPreset(f.id)?.process.stageH ?? f.anchors[f.anchors.length - 1]?.hours ?? 0;
 }
@@ -78,17 +81,18 @@ export function defaultStageH(f: Formula): number {
 export function planBatch(raw: PlanInput): Plan {
   const f = raw.formula;
   const timing = raw.startAt ? (raw.timing ?? 'eat') : 'eat';
-  let stageH = raw.stageH ?? defaultStageH(f);
+  const bread = productOf(f) === 'bread';
+  const cold = bread && !!raw.coldBulk;
+  let stageH = raw.stageH ?? defaultStageH(f, cold);
   let input: PlanInput = raw;
   let window: Plan['window'];
   let fitNote: string | undefined;
   let fitAnchor: Formula['anchors'][number] | undefined;
 
-  const bread = productOf(f) === 'bread';
   if (bread && timing !== 'eat' && raw.startAt) {
     // Bread: start at the autolyse; the loaves go in as soon as the proof is done (no hold).
     const mixAt = new Date(raw.startAt.getTime() + f.process.autolyseMin * 60_000);
-    const bakeAt = new Date(mixAt.getTime() + mixToBakeH(f, stageH) * 3600_000);
+    const bakeAt = new Date(mixAt.getTime() + mixToBakeH(f, stageH, cold) * 3600_000);
     window = { earliest: bakeAt, latest: bakeAt };
     input = { ...raw, mixAt, eatAt: timing === 'start' ? bakeAt : raw.eatAt };
   } else if (timing !== 'eat' && raw.startAt) {
@@ -113,11 +117,17 @@ export function planBatch(raw: PlanInput): Plan {
     input = { ...raw, mixAt: w.mixAt, eatAt: timing === 'start' ? w.earliest : raw.eatAt };
   }
 
-  const yeast = chooseYeast(
-    f,
-    { hours: stageH, tempF: input.riseF ?? input.roomF },
-    { kitchenFactor: input.kitchenFactor, manualPct: input.manualYeastPct },
-  );
+  // Fridge option: the book's dose for its own room schedule, labeled as an assumption (CJ, 2026-11-20).
+  // No source gives a dose for 2-3 days cold (docs/sources/cold-proof.md), so the rate law is not applied.
+  const book = cold ? f.anchors[f.anchors.length - 1] : undefined;
+  const yeastStage = book ? { hours: book.hours, tempF: book.tempF } : { hours: stageH, tempF: input.riseF ?? input.roomF };
+  let yeast = chooseYeast(f, yeastStage, { kitchenFactor: input.kitchenFactor, manualPct: input.manualYeastPct });
+  if (book && yeast.basis === 'book') {
+    yeast = {
+      ...yeast,
+      note: `${yeast.note} Assumption: this is the book's dose for a room-temperature overnight rise; no source gives one for 2-3 days in the fridge.`,
+    };
+  }
   if (fitAnchor) {
     // Only claim the book's yeast when that is what was chosen (a cooler rise gives an estimate).
     fitNote =
@@ -136,7 +146,7 @@ export function planBatch(raw: PlanInput): Plan {
   const water = waterTemps(f, input.roomF, input.temp);
   const amounts = { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour };
   const schedule = bread
-    ? buildBreadSchedule({ formula: f, eatAt: input.eatAt, stageH, mixAt: input.mixAt, amounts })
+    ? buildBreadSchedule({ formula: f, eatAt: input.eatAt, stageH, mixAt: input.mixAt, amounts, coldBulk: cold })
     : buildSchedule({
     formula: f,
     eatAt: input.eatAt,
@@ -151,6 +161,9 @@ export function planBatch(raw: PlanInput): Plan {
   const errors = [...recipe.errors, ...schedule.errors];
   if (input.balls.every((b) => b.count <= 0)) errors.push(bread ? 'Add at least one loaf.' : 'Add at least one dough ball.');
   if (bread && timing === 'both') errors.push('Bread proofs at room temperature with no hold, so pick a start time or a bake time, not both.');
+  if (cold && (stageH < COLD_BULK_MIN_H || stageH > COLD_BULK_MAX_H)) {
+    errors.push(`Fridge time is 2-3 days: ${COLD_BULK_MIN_H}-${COLD_BULK_MAX_H} hours.`);
+  }
   if (yeast.basis === 'manual' && yeast.pct <= 0) errors.push(yeast.warning ?? 'Enter a yeast amount.');
 
   return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors };

@@ -26,6 +26,13 @@ import {
 import type { Route } from './App';
 import { Chips, cToF, download, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
+/** Fridge rise: move the bake a day at a time, same clock time, until it is at least 3 days out (the longest fridge time), so the first step isn't in the past. */
+function fridgeBake(d: Date): Date {
+  const out = new Date(d);
+  while (out.getTime() - Date.now() < 3 * 24 * 3600_000) out.setDate(out.getDate() + 1);
+  return out;
+}
+
 function tomorrowAt(hour: number, minute = 0): Date {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -65,6 +72,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   const [useSnapshot, setUseSnapshot] = useState(!!repeat);
   const [details, setDetails] = useState(false);
   const [stageH, setStageH] = useState<number | undefined>();
+  const [coldBulk, setColdBulk] = useState(!!(bread && (repeat?.coldBulk ?? repeat?.formula.defaults?.coldBulk)));
   const [manualYeast, setManualYeast] = useState('');
   const [edits, setEdits] = useState<{ hydration?: number; salt?: number }>({});
   const [saving, setSaving] = useState(false);
@@ -75,8 +83,12 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
     setDoughId(f.id);
     setBalls(defaultBalls(f));
     // In Start or Both mode the times you typed stay put when you switch dough.
-    if (timing === 'eat') setEatAt(toLocalInput(tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR, f.defaults?.eatMinute ?? 0)));
+    const cold = bread && !!f.defaults?.coldBulk;
+    const bake = tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR, f.defaults?.eatMinute ?? 0);
+    if (timing === 'eat') setEatAt(toLocalInput(cold ? fridgeBake(bake) : bake));
     setMixer(bread ? 'hand' : f.defaults?.mixer ?? settings.mixer);
+    setColdBulk(cold);
+    setStageH(undefined);
     setDefaultsSaved(false);
   };
 
@@ -95,7 +107,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   }, []);
 
   // Any change after saving re-enables "Always start this dough this way".
-  useEffect(() => setDefaultsSaved(false), [balls, eatAt, mixer]);
+  useEffect(() => setDefaultsSaved(false), [balls, eatAt, mixer, coldBulk]);
 
   const savedFormula = doughs.find((d) => d.id === doughId);
   const base = useSnapshot ? repeat?.formula : savedFormula ?? doughs[0];
@@ -118,13 +130,14 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         manualYeastPct: manualYeast ? Number(manualYeast) / 100 : undefined,
         yeastType,
         flour: flour || undefined,
+        coldBulk: bread && coldBulk,
       },
       settings,
     );
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, rise, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit],
+    [formula, balls, eatAt, room, rise, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit, coldBulk],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.
@@ -150,7 +163,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   const saveDefaults = async () => {
     const base = savedFormula;
     if (!base) return;
-    if (bread) await saveDough({ ...base, defaults: { balls: balls.filter(b => b.count > 0), eatHour: new Date(eatAt).getHours(), eatMinute: new Date(eatAt).getMinutes(), mixer } });
+    if (bread) await saveDough({ ...base, defaults: { balls: balls.filter(b => b.count > 0), eatHour: new Date(eatAt).getHours(), eatMinute: new Date(eatAt).getMinutes(), mixer, coldBulk } });
     else await saveDough({
       ...base,
       defaults: { balls: balls.filter((b) => b.count > 0), eatHour: new Date(eatAt).getHours(), mixer },
@@ -182,7 +195,8 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
     }
   };
 
-  const stageLabel = formula.family === 'poolish' ? 'Poolish ripening (hours)' : 'Bulk ferment (hours)';
+  const cold = bread && coldBulk;
+  const stageLabel = formula.family === 'poolish' ? 'Poolish ripening (hours)' : cold ? 'Fridge time (hours)' : 'Bulk ferment (hours)';
 
   return (
     <div className="pad">
@@ -215,7 +229,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
           <div className="row ball" key={i}>
             <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} />
             <span>×</span>
-            <NumField value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} />
+            <NumField whole value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -243,6 +257,19 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         </div>
 
         </details>}
+        {bread && <fieldset className="timing-group">
+          <legend className="sr-only">Rise</legend>
+          <div className="timing-help">
+            <span>Rise</span>
+            <Info label="rise">Room: the book's overnight rise on the counter. Fridge: after the folds the tub goes into the fridge for 2-3 days, then out to warm up, shape and proof. The yeast stays at the book's amount, which is an assumption for the fridge: no source gives one.</Info>
+          </div>
+          <Chips value={coldBulk ? 'fridge' : 'room'} options={[{ v: 'room', label: 'Room' }, { v: 'fridge', label: 'Fridge' }]} onChange={(v) => {
+            setColdBulk(v === 'fridge');
+            setStageH(undefined);
+            if (v === 'fridge' && timing === 'eat') setEatAt(toLocalInput(fridgeBake(new Date(eatAt))));
+          }} />
+          <p className="timing-hint">{coldBulk ? 'Tub in the fridge 2-3 days after the folds.' : 'Overnight on the counter, as in the book.'}</p>
+        </fieldset>}
         <fieldset className="timing-group">
         <legend className="sr-only">Plan around</legend>
         <div className="timing-help">
@@ -374,11 +401,12 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
               <Info label="ferment time">
                 {formula.family === 'poolish'
                   ? 'How long the poolish sits out before the final mix.'
+                  : cold ? 'Hours the tub stays in the fridge, 48-72 (2-3 days). The yeast does not change with it.'
                   : bread ? 'Time from mixing to shaping the loaves.' : 'Time from mixing to dividing into balls.'}{' '}
-                The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.
+                {!cold && 'The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.'}
               </Info>
             </span>
-            <NumField value={stageH ?? defaultStageH(formula)} onValue={setStageH} />
+            <NumField value={stageH ?? defaultStageH(formula, cold)} onValue={setStageH} />
           </label>
           <label>
             <span>

@@ -107,7 +107,7 @@ export function BatchScreen({
       <button className="small" onClick={() => go({
         name: 'plan',
         fromBatch: batch.id,
-        repeat: { formula: p.formula, balls: p.balls, mixer: p.mixer, yeastType: p.yeastType, flour: p.flour },
+        repeat: { formula: p.formula, balls: p.balls, mixer: p.mixer, yeastType: p.yeastType, flour: p.flour, coldBulk: p.coldBulk },
       })}>Same dough again</button>
 </section>
 
@@ -394,6 +394,22 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                       </div>
                     ))}
                   </dl>
+                </details>
+              )}
+              {(s.doneAt || s.passed) && (
+                <details className="step-amounts step-done-detail">
+                  <summary className="small">Show instructions</summary>
+                  <div className="muted small step-detail"><StepDetail stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>
+                  {s.cover && <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'Lid off while shaping'}</div>}
+                  {!!s.ingredients?.length && (
+                    <dl>
+                      {s.ingredients.map((x) => (
+                        <div key={x.name}>
+                          <dt>{x.name}</dt><dd>{x.amount}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </details>
               )}
               {!s.doneAt && !s.passed && s.timer && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} onChange={onChange} />}

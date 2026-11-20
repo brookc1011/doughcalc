@@ -82,6 +82,8 @@ export interface PlannedSnapshot {
   mixerMin?: number;
   /** Average room temperature over the rise, when entered. °F. Optional, so no migration. */
   riseF?: number;
+  /** Bread fridge option: stageH is the fridge hours. Optional (missing: room rise), so no migration. */
+  coldBulk?: boolean;
 }
 
 /** What actually happened. Editable any time. */

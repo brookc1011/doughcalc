@@ -6,7 +6,7 @@ import { HistoryScreen } from './HistoryScreen';
 import { PlanScreen } from './PlanScreen';
 import { SettingsScreen } from './SettingsScreen';
 
-type RepeatBake = Pick<Batch['planned'], 'formula' | 'balls' | 'mixer' | 'yeastType' | 'flour'>;
+type RepeatBake = Pick<Batch['planned'], 'formula' | 'balls' | 'mixer' | 'yeastType' | 'flour' | 'coldBulk'>;
 
 export type Route =
   | { name: 'plan'; fromBatch?: string; repeat?: RepeatBake }

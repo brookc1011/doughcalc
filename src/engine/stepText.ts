@@ -64,6 +64,25 @@ export const ACTIVE_DRY_WATER = '100-110°F';
 export const ACTIVE_DRY_WATER_SOURCE = "Fleischmann's Yeast 101: dissolve active dry yeast in 100-110°F water";
 const isActiveDry = (y?: Ingredient) => y?.name === 'Active dry yeast';
 
+/**
+ * Olive oil and sugar, when the dough has them, go in with the salt after the autolyse
+ * (docs/sources/cold-proof.md: The Pantry Mama and Stadler Made add oil after the autolyse, since oil
+ * during it slows gluten forming). No source was found for sugar; adding it with the salt is our assumption.
+ */
+export function mixExtras(list: Ingredient[]): { text: string; label: string; list: StepIngredient[] } {
+  const oil = find(list, 'oil');
+  const sugar = find(list, 'sugar');
+  const has = [oil && oil.grams > 0 ? oil : undefined, sugar && sugar.grams > 0 ? sugar : undefined].filter((x): x is Ingredient => !!x);
+  if (!has.length) return { text: '', label: '', list: [] };
+  const names = has.map((x) => (x.key === 'oil' ? 'olive oil' : 'sugar'));
+  const parts = has.map((x, i) => `${g(x.grams)} ${names[i]}`);
+  return {
+    text: ` Add ${parts.join(' and ')} at the same time.`,
+    label: names.join(' and '),
+    list: has.map((x, i) => ({ name: cap(names[i]), amount: g(x.grams) })),
+  };
+}
+
 export function ballCut(balls: BallGroup[]): string {
   const live = balls.filter((b) => b.count > 0);
   const total = live.reduce((n, b) => n + b.count, 0);
@@ -104,7 +123,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
     const salt = find(fp.ingredients, 'salt');
     const addLine =
       `Put ${g(find(fp.ingredients, 'flour')?.grams ?? 0)} flour in the tub. Add all the poolish, ${g(salt?.grams ?? 0)} salt and ` +
-      `${g(find(fp.ingredients, 'water')?.grams ?? 0)} water at ${temp(a.water[1])}.`;
+      `${g(find(fp.ingredients, 'water')?.grams ?? 0)} water at ${temp(a.water[1])}.${mixExtras(fp.ingredients).text}`;
     return {
       poolish:
         `Mix ${g(find(pp.ingredients, 'flour')?.grams ?? 0)} flour, ${g(find(pp.ingredients, 'water')?.grams ?? 0)} water at ${temp(a.water[0])} ` +
@@ -125,6 +144,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
           { name: 'Poolish', amount: 'all of it' },
           { name: 'Salt', amount: g(salt?.grams ?? 0) },
           { name: 'Water', amount: `${g(find(fp.ingredients, 'water')?.grams ?? 0)} at ${temp(a.water[1])}` },
+          ...mixExtras(fp.ingredients).list,
         ],
         ball: [pieces],
       },
@@ -139,7 +159,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
       `Pour the rest of the water over ${g(find(t, 'flour')?.grams ?? 0)} flour in a 12-qt tub${method === 'mixer' ? ' or the mixer bowl' : ''} and mix by hand just until there’s no dry flour. Cover and rest 20-30 min.${ap}`,
     mix: mixLine(
       method,
-      `Sprinkle ${g(find(t, 'salt')?.grams ?? 0)} salt over the dough. Stir the yeast water with a finger and pour it over; wipe the cup with a pinch of dough and add that back.`,
+      `Sprinkle ${g(find(t, 'salt')?.grams ?? 0)} salt over the dough. Stir the yeast water with a finger and pour it over; wipe the cup with a pinch of dough and add that back.${mixExtras(t).text}`,
       ddt,
       mixer,
     ),
@@ -156,6 +176,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
       mix: [
         { name: 'Salt', amount: g(find(t, 'salt')?.grams ?? 0) },
         { name: 'Yeast water', amount: 'the cup from the first step' },
+        ...mixExtras(t).list,
       ],
       ball: [pieces],
     },

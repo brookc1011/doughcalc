@@ -15,6 +15,8 @@ import {
 type NumFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   value: number;
   onValue: (n: number) => void;
+  /** Show the number rounded to whole units (the stored value is untouched until you type). */
+  whole?: boolean;
 };
 
 /**
@@ -22,11 +24,12 @@ type NumFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCh
  * no leading zeros ("02"), and tapping it selects the number so you can type over it.
  * The last valid number is kept while the box is blank and restored if you leave it blank.
  */
-export function NumField({ value, onValue, onFocus, onBlur, ...rest }: NumFieldProps) {
-  const [text, setText] = useState(String(value));
+export function NumField({ value, onValue, onFocus, onBlur, whole, ...rest }: NumFieldProps) {
+  const show = (n: number) => String(whole ? Math.round(n) : n);
+  const [text, setText] = useState(show(value));
 
   useEffect(() => {
-    if (text === '' || Number(text) !== value) setText(String(value));
+    if (text === '' || Number(text) !== value) setText(show(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -48,7 +51,7 @@ export function NumField({ value, onValue, onFocus, onBlur, ...rest }: NumFieldP
         if (raw !== '' && !Number.isNaN(Number(raw))) onValue(Number(raw));
       }}
       onBlur={(e) => {
-        if (text === '' || Number.isNaN(Number(text))) setText(String(value));
+        if (text === '' || Number.isNaN(Number(text))) setText(show(value));
         onBlur?.(e);
       }}
     />

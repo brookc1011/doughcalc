@@ -16,8 +16,14 @@
 //   Three folds 30 minutes apart fit the book's "first 1½ hours".
 // - Active dry yeast: dissolved in about 3 tbsp of the measured water (FWSY p.220 method) warmed to
 //   100-110°F (Fleischmann's Yeast 101). The bread page sprinkles instant yeast dry.
+// - Cold bulk (fridge option, CJ's choice 2026-11-20; notes in docs/sources/cold-proof.md): Bread Baking at
+//   Home, "Retarding the dough": into the fridge right after the last fold, up to 3 days, then 30 minutes on the
+//   worktop to warm up before dividing and shaping. King Arthur: 40-60 minutes on the counter after a cold
+//   first rise. ATK: cold-fermented doughs 24-48 h, sometimes up to 72 h. The 2-3 day window is CJ's.
+//   After shaping, the book's room proof and finger-dent test (Reinhart's "out about 2 hours before baking"
+//   covers about the same warm-up, shape and proof).
 
-import { ACTIVE_DRY_WATER, ballCut, type StepAmounts, type StepIngredient, type StepTimer } from '../stepText';
+import { ACTIVE_DRY_WATER, ballCut, mixExtras, type StepAmounts, type StepIngredient, type StepTimer } from '../stepText';
 import type { Schedule, Step } from '../schedule';
 import type { Formula, Ingredient } from '../types';
 
@@ -38,6 +44,13 @@ export const BREAD_PREHEAT_MIN = 45;
 export const PROOF_CHECK_H = 1;
 /** King Arthur: about 30 minutes between folds. */
 export const FOLD_GAP_MIN = 30;
+/** Cold bulk window: 2-3 days (CJ, 2026-11-20; inside BBAH's "up to 3 days" and ATK's 24-72 h). */
+export const COLD_BULK_MIN_H = 48;
+export const COLD_BULK_MAX_H = 72;
+/** Default fridge time: the middle of the 2-3 day window, so a late or early step has room either way. */
+export const COLD_BULK_DEFAULT_H = (COLD_BULK_MIN_H + COLD_BULK_MAX_H) / 2;
+/** Bread Baking at Home: 30 minutes on the worktop after a cold bulk, then divide and shape. */
+export const COLD_WARM_UP_MIN = 30;
 
 export interface BreadScheduleInput {
   formula: Formula;
@@ -52,6 +65,10 @@ export interface BreadScheduleInput {
   lidOffAt?: Date;
   outAt?: Date;
   amounts?: StepAmounts;
+  /** Fridge option: the tub goes into the fridge after the last fold and stageH is the hours it stays there. */
+  coldBulk?: boolean;
+  /** Fridge option: actual (or re-timed) time the tub comes out of the fridge. */
+  pullAt?: Date;
 }
 
 const g = (n: number) => `${Math.round(n).toLocaleString('en-US')} g`;
@@ -68,17 +85,26 @@ export function foldKey(i: number): string {
   return i === 0 ? 'fold' : `fold${i + 1}`;
 }
 
-/** Hours from mixing to the loaves going in (bulk plus proof). */
-export function mixToBakeH(f: Formula, stageH: number): number {
-  return stageH + f.process.minProofH;
+/** Minutes from mixing to the last fold (the fridge option puts the tub in the fridge then). */
+export function lastFoldMin(f: Formula): number {
+  return f.process.foldAfterMin + (foldCount(f) - 1) * FOLD_GAP_MIN;
+}
+
+/** Hours from mixing to the loaves going in. Room: bulk plus proof. Fridge: folds, fridge, warm-up, proof. */
+export function mixToBakeH(f: Formula, stageH: number, coldBulk = false): number {
+  if (!coldBulk) return stageH + f.process.minProofH;
+  return lastFoldMin(f) / 60 + stageH + COLD_WARM_UP_MIN / 60 + f.process.minProofH;
 }
 
 export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
   const { formula: f, stageH } = input;
   const p = f.process;
   const proofH = p.minProofH;
-  const mix = input.mixAt ?? add(input.eatAt, -mixToBakeH(f, stageH) * H);
-  const shape = input.shapeAt ?? add(mix, stageH * H);
+  const cold = !!input.coldBulk;
+  const mix = input.mixAt ?? add(input.eatAt, -mixToBakeH(f, stageH, cold) * H);
+  const fridgeIn = add(mix, lastFoldMin(f) * M);
+  const pull = input.pullAt ?? add(fridgeIn, stageH * H);
+  const shape = input.shapeAt ?? (cold ? add(pull, COLD_WARM_UP_MIN * M) : add(mix, stageH * H));
   const bake = input.bakeAt ?? add(shape, proofH * H);
   const lidOff = input.lidOffAt ?? add(bake, LID_ON_MIN * M);
   const out = input.outAt ?? add(lidOff, LID_OFF_MIN * M);
@@ -119,12 +145,13 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
       : undefined;
   }
 
-  const addYeast = activeDry
+  const extra = mixExtras(t);
+  const addYeast = (activeDry
     ? `Warm the cup of water you kept back to ${ACTIVE_DRY_WATER}, stir in ${yeastText} until dissolved, sprinkle ${salt ? g(salt.grams) : 'the'} salt evenly over the dough and pour the yeast water over.`
-    : `Sprinkle ${salt ? g(salt.grams) : 'the'} salt and ${yeastText} evenly over the dough.`;
+    : `Sprinkle ${salt ? g(salt.grams) : 'the'} salt and ${yeastText} evenly over the dough.`) + extra.text;
   steps.push({
     key: 'mix',
-    label: 'Mix in salt and yeast',
+    label: extra.label ? `Mix in salt, yeast and ${extra.label}` : 'Mix in salt and yeast',
     at: mix,
     detail:
       `${addYeast} Wet your mixing hand (rewetting it 3 or 4 times is fine). Reach under, grab about a quarter of the dough, stretch it and fold it over the top; ` +
@@ -135,21 +162,38 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
     ? [
         { name: 'Salt', amount: g(salt?.grams ?? 0) },
         { name: activeDry ? 'Active dry yeast' : 'Instant yeast', amount: activeDry ? `${yeastG(yeast?.grams ?? 0)}, dissolved in the cup kept back` : `${yeastG(yeast?.grams ?? 0)}${yeast?.tsp ? ` (${yeast.tsp})` : ''}` },
+        ...extra.list,
       ]
     : undefined;
 
   const n = foldCount(f);
   for (let i = 0; i < n; i++) {
     const last = i === n - 1;
-    const optional = n === 3 && i === 2 ? ' The book says three folds are best for volume, but two are fine: skip this one if you need to.' : '';
-    const after = last
-      ? ` Cover and leave it overnight at room temperature. It's ready to divide at 2½-3 times its starting size, ${stageHText(stageH)} after mixing (book: 12-14 h).`
-      : ' Cover again.';
+    const optional =
+      n === 3 && i === 2
+        ? ` The book says three folds are best for volume, but two are fine: skip this one if you need to${cold ? ' and put the tub in the fridge after fold 2' : ''}.`
+        : '';
+    const after = !last
+      ? ' Cover again.'
+      : cold
+        ? ` Cover and put the tub straight into the fridge for ${fmtDays(stageH)} (2-3 days). It rises slowly there.`
+        : ` Cover and leave it overnight at room temperature. It's ready to divide at 2½-3 times its starting size, ${stageHText(stageH)} after mixing (book: 12-14 h).`;
     steps.push({
       key: foldKey(i) as Step['key'],
       label: n > 1 ? `Fold ${i + 1} of ${n}` : 'Fold',
       at: add(mix, (p.foldAfterMin + i * FOLD_GAP_MIN) * M),
       detail: `With a wet hand, reach under, stretch a quarter of the dough up and fold it over the top, going around 4 times.${optional}${after}`,
+    });
+  }
+
+  if (cold) {
+    steps.push({
+      key: 'pull',
+      label: 'Take the tub out of the fridge',
+      at: pull,
+      detail:
+        `Set the covered tub on the counter for ${COLD_WARM_UP_MIN} minutes to take the chill off, then divide and shape. ` +
+        `A cool kitchen may need longer: King Arthur gives 40-60 minutes, until the dough looks slightly puffy.`,
     });
   }
 
@@ -170,7 +214,9 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
     label: 'Finger-dent test',
     at: add(shape, PROOF_CHECK_H * H),
     detail:
-      `Proof is about ${fmtH(proofH)} at about 70°F, closer to 1 h in a warmer kitchen. Poke a loaf about ½ inch deep. Springs back at once: give it more time. ` +
+      `Proof is about ${fmtH(proofH)} at about 70°F, closer to 1 h in a warmer kitchen.` +
+      (cold ? ' Dough from the fridge starts cooler, so it may need longer than that; the test decides.' : '') +
+      ` Poke a loaf about ½ inch deep. Springs back at once: give it more time. ` +
       `Springs back slowly and not all the way: ready to bake. Doesn't spring back: overproofed. With this bread 15 minutes can be the difference.`,
   });
 
@@ -214,6 +260,12 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
   return { steps, errors: [], ballAgeH: (bake.getTime() - shape.getTime()) / H };
 }
 
+function fmtDays(h: number): string {
+  const d = h / 24;
+  if (!Number.isInteger(d * 2)) return `about ${fmtH(h)}`;
+  return `${Math.floor(d)}${Number.isInteger(d) ? '' : '½'} ${d === 1 ? 'day' : 'days'}`;
+}
+
 function stageHText(h: number): string {
   return `about ${fmtH(h)}`;
 }
@@ -233,6 +285,7 @@ export const BREAD_COVER: Partial<Record<string, 'on' | 'off'>> = {
   fold2: 'on',
   fold3: 'on',
   fold4: 'on',
+  pull: 'on',
   shape: 'off',
 };
 
@@ -240,6 +293,7 @@ export function breadTimer(key: string): StepTimer | undefined {
   if (key === 'autolyse') return { kind: 'countdown', min: 20, upToMin: 30, source: 'FWSY p.89: rest 20-30 minutes' };
   if (key === 'mix') return { kind: 'stopwatch', note: 'The book gives no time for mixing by hand: mix until fully integrated with some tension.' };
   if (/^fold\d*$/.test(key)) return { kind: 'countdown', min: FOLD_GAP_MIN, source: 'King Arthur: about 30 minutes between folds' };
+  if (key === 'pull') return { kind: 'countdown', min: COLD_WARM_UP_MIN, source: 'Bread Baking at Home: 30 minutes to warm up after a cold bulk' };
   if (key === 'shape') return { kind: 'countdown', min: PROOF_CHECK_H * 60, source: 'FWSY p.89: check the loaves after 1 hour' };
   if (key === 'bake') return { kind: 'countdown', min: LID_ON_MIN, source: 'FWSY p.89: 30 minutes with the lid on' };
   if (key === 'lidOff') return { kind: 'countdown', min: LID_OFF_MIN, upToMin: LID_OFF_UP_TO_MIN, source: 'FWSY p.89: 20-30 minutes uncovered; check at 15' };
