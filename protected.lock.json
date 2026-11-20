@@ -1,10 +1,10 @@
 {
   "public/push-sw.js": "015cc888fc9d50237d786978a3abad0f1fcb41d495b5beece1b6fbbc4a6f5689",
-  "src/api.ts": "ef109b86fc4b4b41aef92676fcfd6aa1d80afe8a4d74f795f6647f3a783afe8f",
+  "src/api.ts": "5dddba57cf590f632c6e72c205af2bb7713b3f0cdb737c31c73271789827e731",
   "src/data/photo.ts": "8a2232118e21b7b8e3da14fa067129b355d9f5c0dfc0e124a21d6626a776d7c2",
   "src/data/push.ts": "5daf7eb9881ce8280cb351be1389ff89ae2a865d257fa7ae2995e8826cc78479",
-  "src/data/store.ts": "7a00c15eacbfd23b6af7d0a6b598c42ceafb518a8174745d1dde8f343b1d767e",
-  "src/data/types.ts": "a33afb8d2bc67ba1d80c762aa3e3166bad3a22e8091bd7623a33edfb6569bdcb",
+  "src/data/store.ts": "8fca67427b37493256a9020c761afee153b1d389a71a7804caf5db431d5ac50e",
+  "src/data/types.ts": "d1a5007b195969a57b605570a68aa4dc314fa234dddca7d2c26db07bc2b8882d",
   "src/data/vapid.ts": "3eb1f6b5d6904f759d3dc84f039c95467c3bae5fad53fbe4bba27a4dbc67690f",
   "src/engine/advice.ts": "34747bb455586a89fb9d0c67de58f81cfc7bd0dffdd54bea3ddc6edf4861e147",
   "src/engine/bread/presets.ts": "ccf25a44af679a01a45bac207369e832f37ac7c9f743b63d8859172f4acad2d0",

@@ -1,6 +1,6 @@
 import { HELP_COPY, WATER_SOURCES } from './helpCopy';
 import { useState } from 'react';
-import { exportBackup, fmtWhen, importBackup, saveSettings, setReminderLead, type Settings } from '../api';
+import { exportBackup, fmtWhen, getSettings, importBackup, setReminderLead, updateSettings, type Settings } from '../api';
 import type { Route } from './App';
 import { cToF, fToC, Info, NumField, shareOrDownload } from './common';
 
@@ -11,11 +11,14 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
   const show = (f: number) => Math.round(unit === 'F' ? f : fToC(f));
   const store = (v: string) => (unit === 'F' ? Number(v) : cToF(Number(v)));
 
-  const save = async (next: Settings) => {
-    setS(next);
-    await saveSettings(next);
+  // Save only the field that changed, over what is stored now. Backup, restore and reminders also
+  // write settings, so this screen's copy can be out of date; never write the whole copy back.
+  const save = async (patch: Partial<Settings>) => {
+    setS((cur) => ({ ...cur, ...patch }));
+    setS(await updateSettings(patch));
     onChange();
   };
+  const refresh = async () => setS(await getSettings());
 
   return (
     <div className="pad settings-screen">
@@ -25,7 +28,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <h2>Kitchen defaults</h2>
         <label>
           Units
-          <select value={unit} onChange={(e) => save({ ...s, unit: e.target.value as 'F' | 'C' })}>
+          <select value={unit} onChange={(e) => save({ unit: e.target.value as 'F' | 'C' })}>
             <option value="F">°F</option>
             <option value="C">°C</option>
           </select>
@@ -35,28 +38,28 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             Warm-up out of the fridge (hours)
             <Info label="warm-up time">{HELP_COPY["warm-up time"]}</Info>
           </span>
-          <NumField value={s.warmUpH} onValue={(n) => save({ ...s, warmUpH: n })} />
+          <NumField value={s.warmUpH} onValue={(n) => save({ warmUpH: n })} />
         </label>
         <label>
           <span>
             Kitchen adjustment (yeast multiplier)
             <Info label="kitchen adjustment">{HELP_COPY["kitchen adjustment"]}</Info>
           </span>
-          <NumField value={s.kitchenFactor} onValue={(n) => save({ ...s, kitchenFactor: n })} />
+          <NumField value={s.kitchenFactor} onValue={(n) => save({ kitchenFactor: n })} />
         </label>
         <label>
           <span>
             Oven preheat (minutes)
             <Info label="preheat time">{HELP_COPY["preheat time"]}</Info>
           </span>
-          <NumField value={s.preheatMin ?? 60} onValue={(n) => save({ ...s, preheatMin: n })} />
+          <NumField value={s.preheatMin ?? 60} onValue={(n) => save({ preheatMin: n })} />
         </label>
         <label>
           <span>
             Stand mixer time (minutes)
             <Info label="mixer time">{HELP_COPY["mixer time"]}</Info>
           </span>
-          <NumField value={s.mixerMin ?? 5} onValue={(n) => save({ ...s, mixerMin: n })} />
+          <NumField value={s.mixerMin ?? 5} onValue={(n) => save({ mixerMin: n })} />
         </label>
       </section>
 
@@ -71,7 +74,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             value={s.reminderLeadMin ?? 0}
             onValue={async (n) => {
               const next = await setReminderLead(n);
-              setS({ ...s, reminderLeadMin: next.reminderLeadMin });
+              setS(next);
               onChange();
             }}
           />
@@ -98,21 +101,21 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <div className="row">
           <label className="grow">
             From (°{unit})
-            <NumField value={show(s.bandLowF)} onValue={(n) => save({ ...s, bandLowF: store(String(n)) })} />
+            <NumField value={show(s.bandLowF)} onValue={(n) => save({ bandLowF: store(String(n)) })} />
           </label>
           <label className="grow">
             To (°{unit})
-            <NumField value={show(s.bandHighF)} onValue={(n) => save({ ...s, bandHighF: store(String(n)) })} />
+            <NumField value={show(s.bandHighF)} onValue={(n) => save({ bandHighF: store(String(n)) })} />
           </label>
         </div>
         <div className="row">
           <label className="grow">
             Hand friction (°F)
-            <NumField value={s.frictionHandF} onValue={(n) => save({ ...s, frictionHandF: n })} />
+            <NumField value={s.frictionHandF} onValue={(n) => save({ frictionHandF: n })} />
           </label>
           <label className="grow">
             Mixer friction (°F)
-            <NumField value={s.frictionMixerF} onValue={(n) => save({ ...s, frictionMixerF: n })} />
+            <NumField value={s.frictionMixerF} onValue={(n) => save({ frictionMixerF: n })} />
           </label>
         </div>
         <p className="muted small">Defaults are assumptions inside King Arthur's ranges: 0-4°F gentle folds, 22-24°F KitchenAid.</p>
@@ -128,7 +131,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           <div className="row between oven-row" key={o.id}>
             <span>{o.name}</span>
             {s.ovens.length > 1 && (
-              <button className="small" onClick={() => save({ ...s, ovens: s.ovens.filter((x) => x.id !== o.id) })}>
+              <button className="small" onClick={() => save({ ovens: s.ovens.filter((x) => x.id !== o.id), ...(s.lastOvenId === o.id ? { lastOvenId: s.ovens.find((x) => x.id !== o.id)!.id } : {}) })}>
                 Remove
               </button>
             )}
@@ -140,7 +143,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             className="small"
             disabled={!newOven}
             onClick={() => {
-              save({ ...s, ovens: [...s.ovens, { id: `oven-${Date.now()}`, name: newOven }] });
+              save({ ovens: [...s.ovens, { id: `oven-${Date.now()}`, name: newOven }] });
               setNewOven('');
             }}
           >
@@ -161,6 +164,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             onClick={async () => {
               const { filename, json } = await exportBackup();
               await shareOrDownload(filename, json, 'application/json');
+              await refresh();
               onChange();
             }}
           >
@@ -172,11 +176,15 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
               type="file"
               accept="application/json"
               onChange={async (e) => {
-                const f = e.target.files?.[0];
+                const input = e.currentTarget;
+                const f = input.files?.[0];
+                // Clear the picker so choosing the same file again still triggers a restore.
+                input.value = '';
                 if (!f) return;
                 if (!confirm('Replace everything on this phone with this backup?')) return;
                 try {
                   await importBackup(await f.text());
+                  await refresh();
                   onChange();
                   alert('Restored.');
                 } catch (err) {

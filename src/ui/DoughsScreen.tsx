@@ -195,7 +195,8 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
   const save = async () => {
     const next: Formula = {
       ...f,
-      defaults: { balls: balls.filter((b) => b.count > 0), eatHour, eatMinute: minute, mixer: mixer || undefined },
+      // Keep any default this screen doesn't edit (the saved Fridge rise choice, for one).
+      defaults: { ...f.defaults, balls: balls.filter((b) => b.count > 0), eatHour, eatMinute: minute, mixer: mixer || undefined },
     };
     await saveDough(next);
     await load();

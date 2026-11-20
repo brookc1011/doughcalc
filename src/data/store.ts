@@ -141,34 +141,77 @@ export async function exportAll(): Promise<ExportFile> {
     schema: SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     // The reminder id belongs to this phone; a restore on another phone must not share its server slot.
-    settings: (({ pushDeviceId: _omit, ...s }) => s)(await getSettings()) as Settings,
+    // Same for its queue of reminder clears still owed to the server.
+    settings: (({ pushDeviceId: _omit, pendingCancels: _queue, ...s }) => s)(await getSettings()) as Settings,
     doughs: await d.getAll('doughs'),
     batches: await d.getAll('batches'),
     photos: await Promise.all(photos.map(async (p) => ({ id: p.id, dataUrl: await blobToDataUrl(p.blob) }))),
   };
 }
 
-/** Replaces everything on this phone with the backup's contents. */
-export async function importAll(file: ExportFile): Promise<void> {
-  if (file.app !== 'dough-app') throw new Error('Not a Dough backup file.');
-  if (file.schema > SCHEMA_VERSION) throw new Error('This backup is from a newer version of the app. Update the app first.');
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const hasId = (v: unknown) => isObj(v) && typeof v.id === 'string' && v.id !== '';
+
+/**
+ * Checks a backup file before anything on the phone is touched. Throws a plain-language error naming
+ * what is wrong, so a damaged or partial file can never clear the phone first.
+ */
+export function checkBackup(file: unknown): ExportFile {
+  if (!isObj(file) || file.app !== 'dough-app') throw new Error('Not a Dough backup file.');
+  const schema = file.schema;
+  if (typeof schema !== 'number' || !Number.isInteger(schema) || schema < 1) {
+    throw new Error('This backup file is damaged (no version number). Nothing was changed.');
+  }
+  if (schema > SCHEMA_VERSION) throw new Error('This backup is from a newer version of the app. Update the app first.');
+  const bad = (what: string) => new Error(`This backup file is damaged (${what}). Nothing was changed.`);
+  if (!isObj(file.settings)) throw bad('settings missing');
+  for (const key of ['doughs', 'batches', 'photos'] as const) {
+    if (!Array.isArray(file[key])) throw bad(`${key} missing`);
+  }
+  if (!(file.doughs as unknown[]).every(hasId)) throw bad('a dough has no id');
+  if (!(file.batches as unknown[]).every((b) => hasId(b) && isObj((b as Record<string, unknown>).planned) && isObj((b as Record<string, unknown>).actual))) {
+    throw bad('a bake is incomplete');
+  }
+  if (!(file.photos as unknown[]).every((p) => hasId(p) && typeof (p as Record<string, unknown>).dataUrl === 'string' && ((p as Record<string, unknown>).dataUrl as string).startsWith('data:'))) {
+    throw bad('a photo is unreadable');
+  }
+  return file as unknown as ExportFile;
+}
+
+/** Replaces everything on this phone with the backup's contents. Checks the whole file first. */
+export async function importAll(raw: unknown): Promise<void> {
+  const file = checkBackup(raw);
+  // Decode photos before the wipe too: a bad one fails here, with the phone untouched.
+  let photos: Photo[];
+  try {
+    photos = file.photos.map((p) => ({ id: p.id, blob: dataUrlToBlob(p.dataUrl) }));
+  } catch {
+    throw new Error('This backup file is damaged (a photo is unreadable). Nothing was changed.');
+  }
   const d = await db();
   const tx = d.transaction(['settings', 'doughs', 'batches', 'photos'], 'readwrite');
-  // Keep this phone's own reminder id, never the one in the file (older backups carried it).
-  const ownDeviceId = ((await tx.objectStore('settings').get('settings')) as Settings | undefined)?.pushDeviceId;
-  await Promise.all([
-    tx.objectStore('settings').clear(),
-    tx.objectStore('doughs').clear(),
-    tx.objectStore('batches').clear(),
-    tx.objectStore('photos').clear(),
-  ]);
-  const { pushDeviceId: _fromFile, ...settings } = file.settings;
-  await tx.objectStore('settings').put({ ...DEFAULT_SETTINGS, ...settings, pushDeviceId: ownDeviceId });
-  for (const f of file.doughs) await tx.objectStore('doughs').put(f);
-  // Restored batches start with reminders off on this phone; turn them back on per batch.
-  for (const b of file.batches) {
-    await tx.objectStore('batches').put({ ...b, actual: { ...b.actual, reminders: false, reminderSync: undefined } });
+  try {
+    // Keep this phone's own reminder id, never the one in the file (older backups carried it).
+    const own = (await tx.objectStore('settings').get('settings')) as Settings | undefined;
+    await Promise.all([
+      tx.objectStore('settings').clear(),
+      tx.objectStore('doughs').clear(),
+      tx.objectStore('batches').clear(),
+      tx.objectStore('photos').clear(),
+    ]);
+    const { pushDeviceId: _fromFile, pendingCancels: _theirQueue, ...settings } = file.settings;
+    await tx.objectStore('settings').put({ ...DEFAULT_SETTINGS, ...settings, pushDeviceId: own?.pushDeviceId, pendingCancels: own?.pendingCancels });
+    for (const f of file.doughs) await tx.objectStore('doughs').put(f);
+    // Restored batches start with reminders off on this phone; turn them back on per batch.
+    for (const b of file.batches) {
+      await tx.objectStore('batches').put({ ...b, actual: { ...b.actual, reminders: false, reminderSync: undefined } });
+    }
+    for (const p of photos) await tx.objectStore('photos').put(p);
+    await tx.done;
+  } catch (e) {
+    // Roll back the clear so the phone keeps what it had.
+    try { tx.abort(); } catch { /* already finished */ }
+    await tx.done.catch(() => undefined);
+    throw e;
   }
-  for (const p of file.photos) await tx.objectStore('photos').put({ id: p.id, blob: dataUrlToBlob(p.dataUrl) });
-  await tx.done;
 }

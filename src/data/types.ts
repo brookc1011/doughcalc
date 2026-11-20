@@ -46,6 +46,8 @@ export interface Settings {
   flour?: Flour;
   /** Stand mixer minutes. Default 5 (America's Test Kitchen); anything else is the baker's choice. */
   mixerMin?: number;
+  /** Deleted batches whose server reminders still need clearing (the phone was offline). Optional, so no migration. */
+  pendingCancels?: string[];
 }
 
 /** Flour choices tracked per batch. Info only: the steps don't change (see helpCopy "flour"). */

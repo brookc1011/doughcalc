@@ -46,6 +46,7 @@ export function BatchScreen({
   onSaved: () => void;
 }) {
   const [batch, setBatch] = useState<Batch | null>(null);
+  const [missing, setMissing] = useState(false);
   const [rating, setRating] = useState(false);
   const [result, setResult] = useState<{ suggestion?: Suggestion; backupDue: boolean } | null>(null);
 
@@ -53,9 +54,22 @@ export function BatchScreen({
   useEffect(() => { if (result) jumpTo(BATCH_TARGETS.result); }, [result]);
 
   useEffect(() => {
-    getBatch(id).then((b) => setBatch(b ?? null));
+    getBatch(id).then((b) => {
+      setBatch(b ?? null);
+      setMissing(!b);
+    });
   }, [id]);
 
+  if (missing) {
+    return (
+      <div className="pad">
+        <p>This bake was deleted, so there is nothing to show.</p>
+        <button className="small" onClick={() => go({ name: 'history' })}>
+          Go to Bakes
+        </button>
+      </div>
+    );
+  }
   if (!batch) return <p className="pad">Loading…</p>;
   const p = batch.planned;
   const bread = productOf(p.formula) === 'bread';
@@ -179,7 +193,7 @@ const clock = (ms: number) => {
 };
 
 /** Timer for one step: countdown (sourced minutes) or stopwatch (no source gives a time). */
-function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepKey: string; timer: StepTimer; onChange: (b: Batch) => void }) {
+function StepTimerRow({ batch, stepKey, timer, run }: { batch: Batch; stepKey: string; timer: StepTimer; run: Run }) {
   const [now, setNow] = useState(Date.now);
   const st = timerState(batch, now);
   const running = st?.key === stepKey;
@@ -197,12 +211,12 @@ function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepK
             <span className="muted small">{timer.kind === 'stopwatch' ? 'Elapsed' : 'Time left'}</span>
             {st.done ? <strong role="status">Time’s up</strong> : <strong role="timer">{clock(st.ms)}</strong>}
           </div>
-          <button className="link small" onClick={async () => onChange(await stopTimer(batch.id))}>
+          <button className="link small" onClick={() => run(() => stopTimer(batch.id))}>
             {st.done ? 'Clear' : 'Stop'}
           </button>
         </>
       ) : (
-        <button className="small" onClick={async () => { setNow(Date.now()); onChange(await startTimer(batch.id, stepKey)); }}>
+        <button className="small" onClick={() => { setNow(Date.now()); return run(() => startTimer(batch.id, stepKey)); }}>
           {st && !running ? label.replace('Start ', 'Switch to ') : label}
         </button>
       )}
@@ -215,8 +229,11 @@ function StepTimerRow({ batch, stepKey, timer, onChange }: { batch: Batch; stepK
   );
 }
 
+/** Runs one checklist action and shows the new batch, or an error if it didn't save. */
+type Run = (action: () => Promise<Batch>) => Promise<void>;
+
 /** After the fold: room temperature during the bulk rise, optional. */
-function BulkRoomPrompt({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; onChange: (b: Batch) => void }) {
+function BulkRoomPrompt({ batch, unit, run }: { batch: Batch; unit: 'F' | 'C'; run: Run }) {
   const [v, setV] = useState('');
   return (
     <div className="bulk-room" role="group" aria-label="Room temperature during the rise">
@@ -225,10 +242,10 @@ function BulkRoomPrompt({ batch, unit, onChange }: { batch: Batch; unit: 'F' | '
         <input type="number" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} />
       </label>
       <div className="step-actions">
-        <button className="small primary-small" disabled={v === '' || !Number.isFinite(Number(v))} onClick={async () => onChange(await recordBulkRoomTemp(batch.id, Number(v), unit))}>
+        <button className="small primary-small" disabled={v === '' || !Number.isFinite(Number(v))} onClick={() => run(() => recordBulkRoomTemp(batch.id, Number(v), unit))}>
           Save
         </button>
-        <button className="link small" onClick={async () => onChange(await recordBulkRoomTemp(batch.id, null, unit))}>
+        <button className="link small" onClick={() => run(() => recordBulkRoomTemp(batch.id, null, unit))}>
           Skip
         </button>
       </div>
@@ -243,6 +260,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
   const [pickAt, setPickAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
   const remindOn = !!batch.actual.reminders;
   const perm = pushPermission();
   const allDone = !prog.nextKey;
@@ -250,9 +268,18 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
   // Before anything is ticked, the first step starts whenever you do.
   const firstUntouched = prog.steps.some((s) => s.doneAt || s.passed) ? undefined : prog.steps[0]?.key;
 
+  const run: Run = async (action) => {
+    setErr('');
+    try {
+      onChange(await action());
+    } catch {
+      setErr('Couldn’t save that. Nothing changed. Try again.');
+    }
+  };
+
   const check = async (key: string, at?: Date) => {
     setPickFor(null);
-    onChange(await checkStep(batch.id, key, at));
+    await run(() => checkStep(batch.id, key, at));
   };
 
   const toggleReminders = async () => {
@@ -322,6 +349,12 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
         </p>
       )}
 
+      {err && (
+        <p className="warn" role="alert">
+          {err}
+        </p>
+      )}
+
       <ol className="timeline checklist-steps">
         {prog.steps.map((s, i) => {
           const state = stepPresentation(s, prog.nextKey);
@@ -332,7 +365,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
               <div className="step-heading">
                 <b>{s.doneAt ? '✓ ' : ''}{s.label}</b>
                 {s.doneAt && (
-                  <button className="link small" aria-label={`Undo ${s.label}`} onClick={async () => onChange(await uncheckStep(batch.id, s.key))}>
+                  <button className="link small" aria-label={`Undo ${s.label}`} onClick={() => run(() => uncheckStep(batch.id, s.key))}>
                     Undo
                   </button>
                 )}
@@ -412,9 +445,10 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   )}
                 </details>
               )}
-              {!s.doneAt && !s.passed && s.timer && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} onChange={onChange} />}
+              {/* A running timer stays on screen after Done (Autolyse: Done starts the rest the timer counts). */}
+              {s.timer && ((!s.doneAt && !s.passed) || batch.actual.timer?.key === s.key) && <StepTimerRow batch={batch} stepKey={s.key} timer={s.timer} run={run} />}
               {!s.doneAt && !s.passed && gap && <div className="small step-gap">{gap}</div>}
-              {s.key === 'fold' && showBulkRoom && <BulkRoomPrompt batch={batch} unit={unit} onChange={onChange} />}
+              {s.key === 'fold' && showBulkRoom && <BulkRoomPrompt batch={batch} unit={unit} run={run} />}
             </li>
           );
         })}
@@ -617,19 +651,34 @@ function RateForm({
 }
 
 function ActualForm({ batch, unit, onSave }: { batch: Batch; unit: 'F' | 'C'; onSave: (a: Batch['actual']) => Promise<void> }) {
-  const a = batch.actual;
-  const [open, setOpen] = useState(false);
   const toUnit = (f?: number) => (f === undefined ? '' : String(Math.round(unit === 'F' ? f : fToC(f))));
-  const [mixAt, setMixAt] = useState(a.mixAt ? toLocalInput(new Date(a.mixAt)) : '');
-  const [ballAt, setBallAt] = useState(a.ballAt ? toLocalInput(new Date(a.ballAt)) : '');
-  const [room, setRoom] = useState(toUnit(a.roomF));
-  const [fdt, setFdt] = useState(toUnit(a.finalDoughF));
-  const [notes, setNotes] = useState(a.notes ?? '');
   const fromUnit = (v: string) => (v === '' ? undefined : unit === 'F' ? Number(v) : cToF(Number(v)));
+  // The form's values as of when it was opened, from the latest batch (check-offs fill some of them).
+  const read = (a: Batch['actual']) => ({
+    mixAt: a.mixAt ? toLocalInput(new Date(a.mixAt)) : '',
+    ballAt: a.ballAt ? toLocalInput(new Date(a.ballAt)) : '',
+    room: toUnit(a.roomF),
+    fdt: toUnit(a.finalDoughF),
+    notes: a.notes ?? '',
+  });
+  const [open, setOpen] = useState(false);
+  const [start, setStart] = useState(() => read(batch.actual));
+  const [v, setV] = useState(start);
+  const [error, setError] = useState('');
+  const set = (p: Partial<typeof v>) => setV((cur) => ({ ...cur, ...p }));
 
   if (!open) {
     return (
-      <button className="details-toggle actual-toggle" onClick={() => setOpen(true)}>
+      <button
+        className="details-toggle actual-toggle"
+        onClick={() => {
+          const now = read(batch.actual);
+          setStart(now);
+          setV(now);
+          setError('');
+          setOpen(true);
+        }}
+      >
         What actually happened (optional)
       </button>
     );
@@ -640,37 +689,43 @@ function ActualForm({ batch, unit, onSave }: { batch: Batch; unit: 'F' | 'C'; on
       <p className="muted small">Only fill in what differed from the plan.</p>
       <label>
         Mixed at
-        <input type="datetime-local" value={mixAt} onChange={(e) => setMixAt(e.target.value)} />
+        <input type="datetime-local" value={v.mixAt} onChange={(e) => set({ mixAt: e.target.value })} />
       </label>
       <label>
         {productOf(batch.planned.formula) === 'bread' ? 'Shaped at' : 'Balled at'}
-        <input type="datetime-local" value={ballAt} onChange={(e) => setBallAt(e.target.value)} />
+        <input type="datetime-local" value={v.ballAt} onChange={(e) => set({ ballAt: e.target.value })} />
       </label>
       <div className="row">
         <label className="grow">
           Room (°{unit})
-          <input type="number" value={room} onChange={(e) => setRoom(e.target.value)} />
+          <input type="number" value={v.room} onChange={(e) => set({ room: e.target.value })} />
         </label>
         <label className="grow">
           Dough temp after mix (°{unit})
-          <input type="number" value={fdt} onChange={(e) => setFdt(e.target.value)} />
+          <input type="number" value={v.fdt} onChange={(e) => set({ fdt: e.target.value })} />
         </label>
       </div>
       <label>
         Notes
-        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <textarea rows={2} value={v.notes} onChange={(e) => set({ notes: e.target.value })} />
       </label>
+      {error && <p className="warn" role="alert">{error}</p>}
       <button
         className="small"
         onClick={async () => {
-          await onSave({
-            mixAt: mixAt ? new Date(mixAt).toISOString() : undefined,
-            ballAt: ballAt ? new Date(ballAt).toISOString() : undefined,
-            roomF: fromUnit(room),
-            finalDoughF: fromUnit(fdt),
-            notes: notes || undefined,
-          });
-          setOpen(false);
+          // Save only the fields changed here, so nothing recorded by the checklist is overwritten.
+          const patch: Batch['actual'] = {};
+          if (v.mixAt !== start.mixAt) patch.mixAt = v.mixAt ? new Date(v.mixAt).toISOString() : undefined;
+          if (v.ballAt !== start.ballAt) patch.ballAt = v.ballAt ? new Date(v.ballAt).toISOString() : undefined;
+          if (v.room !== start.room) patch.roomF = fromUnit(v.room);
+          if (v.fdt !== start.fdt) patch.finalDoughF = fromUnit(v.fdt);
+          if (v.notes !== start.notes) patch.notes = v.notes || undefined;
+          try {
+            if (Object.keys(patch).length) await onSave(patch);
+            setOpen(false);
+          } catch {
+            setError('Couldn’t save. Your entries are still here. Try again.');
+          }
         }}
       >
         Save

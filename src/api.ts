@@ -27,6 +27,17 @@ const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.r
 export const getSettings = store.getSettings;
 export const saveSettings = store.saveSettings;
 
+/**
+ * Change some settings without touching the rest: reads what is stored now and merges the change in.
+ * Screens use this so an out-of-date copy on screen can't undo a restore or drop the reminder id.
+ */
+export async function updateSettings(patch: Partial<Omit<Settings, 'id' | 'pushDeviceId'>>): Promise<Settings> {
+  const s = await store.getSettings();
+  const next = { ...s, ...patch, id: s.id, pushDeviceId: s.pushDeviceId };
+  await store.saveSettings(next);
+  return next;
+}
+
 /** Ask the browser not to evict our data. Stores the answer in settings. */
 export async function requestPersistence(): Promise<boolean> {
   const granted = (await navigator.storage?.persist?.()) ?? false;
@@ -257,7 +268,26 @@ export async function lockIn(plan: Plan, mixer: 'hand' | 'mixer', flour?: Flour)
 // ---------- batches and bake sessions ----------
 export const listBatches = store.listBatches;
 export const getBatch = store.getBatch;
-export const deleteBatch = store.deleteBatch;
+/**
+ * Delete a batch and clear its reminders on the server so they stop buzzing. If the phone is offline,
+ * the clear is queued and retried with the other reminder updates.
+ */
+export async function deleteBatch(id: string): Promise<void> {
+  const b = await store.getBatch(id);
+  await store.deleteBatch(id);
+  if (b && (b.actual.reminders || b.actual.reminderSync)) await cancelOrQueue([id]);
+}
+
+/** Clear reminders for batches that no longer exist here; anything that fails waits in the retry queue. */
+async function cancelOrQueue(ids: string[]): Promise<void> {
+  const s = await store.getSettings();
+  if (!s.pushDeviceId) return;
+  const failed: string[] = [];
+  for (const id of ids) await cancelReminders(s.pushDeviceId, id).catch(() => failed.push(id));
+  const latest = await store.getSettings();
+  const queue = [...new Set([...(latest.pendingCancels ?? []).filter((x) => !ids.includes(x)), ...failed])];
+  await store.saveSettings({ ...latest, pendingCancels: queue.length ? queue : undefined });
+}
 
 export async function updateActual(batchId: string, actual: Actual): Promise<Batch> {
   const b = await store.getBatch(batchId);
@@ -394,7 +424,9 @@ export async function remindersOn(batchId: string): Promise<Batch> {
 export async function remindersOff(batchId: string): Promise<Batch> {
   const b = await store.getBatch(batchId);
   if (!b) throw new Error('Batch not found');
-  return pushSync({ ...b, actual: { ...b.actual, reminders: false } });
+  const next = { ...b, actual: { ...b.actual, reminders: false } };
+  await store.saveBatch(next);
+  return pushSync(next);
 }
 
 /** Resend remaining steps after a check-off. */
@@ -409,22 +441,40 @@ async function syncReminders(b: Batch): Promise<Batch> {
  * may be out of date. The checklist itself never waits on the server.
  */
 async function pushSync(b: Batch): Promise<Batch> {
-  let ok = true;
-  try {
-    const device = await deviceId();
-    if (b.actual.reminders) await sendReminders(b, device, false);
-    else await cancelReminders(device, b.id);
-  } catch {
-    ok = false;
+  // What the server needs to match. If another check-off lands while this one is on the network,
+  // the saved batch changes under us: send again with the newer copy (a few tries, then the retry queue).
+  const sig = (x: Batch) => JSON.stringify([x.actual.reminders, x.actual.done ?? {}, x.actual.timer ?? null]);
+  let sent = b;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let ok = true;
+    try {
+      const device = await deviceId();
+      if (sent.actual.reminders) await sendReminders(sent, device, false);
+      else await cancelReminders(device, sent.id);
+    } catch {
+      ok = false;
+    }
+    // Always save onto the latest stored copy, never the one read before the network call,
+    // so a slow sync can't undo a check-off made meanwhile.
+    const fresh = await store.getBatch(sent.id);
+    if (!fresh) return sent; // deleted meanwhile: don't bring it back
+    if (!ok || sig(fresh) === sig(sent)) {
+      const next = { ...fresh, actual: { ...fresh.actual, reminderSync: ok ? undefined : ('pending' as const) } };
+      await store.saveBatch(next);
+      return next;
+    }
+    sent = fresh;
   }
-  const actual: Actual = { ...b.actual, reminderSync: ok ? undefined : 'pending' };
-  const next = { ...b, actual };
+  const fresh = (await store.getBatch(sent.id)) ?? sent;
+  const next = { ...fresh, actual: { ...fresh.actual, reminderSync: 'pending' as const } };
   await store.saveBatch(next);
   return next;
 }
 
 /** Retry any reminder updates that failed earlier. Call on app start and when the phone reconnects. */
 export async function retryReminders(): Promise<number> {
+  const queued = (await store.getSettings()).pendingCancels ?? [];
+  if (queued.length) await cancelOrQueue(queued);
   const pending = (await store.listBatches()).filter((b) => b.actual.reminderSync === 'pending');
   let fixed = 0;
   for (const b of pending) if (!(await pushSync(b)).actual.reminderSync) fixed++;
@@ -620,11 +670,15 @@ export async function importBackup(json: string): Promise<void> {
   // Batches with reminders on before the restore: clear them on the server too (best effort), since the
   // restore replaces them and restored batches start with reminders off.
   const before = (await store.listBatches()).filter((b) => b.actual.reminders);
-  await store.importAll(JSON.parse(json));
-  const s = await store.getSettings();
-  if (s.pushDeviceId) {
-    for (const b of before) await cancelReminders(s.pushDeviceId, b.id).catch(() => undefined);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error('Not a Dough backup file.');
   }
+  await store.importAll(parsed);
+  const s = await store.getSettings();
+  if (s.pushDeviceId && before.length) await cancelOrQueue(before.map((b) => b.id));
 }
 
 // ---------- display helpers ----------
