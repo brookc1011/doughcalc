@@ -5,6 +5,7 @@ import { buildBreadSchedule, COLD_BULK_DEFAULT_H, COLD_BULK_MAX_H, COLD_BULK_MIN
 import {
   buildSchedule,
   eatWindow,
+  OONI_ACTIVE_DRY_G,
   OONI_FLOUR_G,
   OONI_SOURCE,
   OONI_YEAST_G,
@@ -64,7 +65,14 @@ export interface PlanInput {
    * assumption). Straight pizza doughs: Ooni's cold-proof method and yeast. Ignored for poolish pizza.
    */
   coldBulk?: boolean;
+  /** The current time. When set, a plan whose first step has already passed is refused unless alreadyStarted. */
+  now?: Date;
+  /** Recording a bake already under way: past steps are allowed. */
+  alreadyStarted?: boolean;
 }
+
+/** Form fields a plan error can belong to, so the screen can show it by that field. */
+export type PlanField = 'balls' | 'time' | 'room' | 'rise' | 'stage' | 'yeast' | 'hydration' | 'salt' | 'kitchen';
 
 export interface Plan {
   /** input.eatAt is the resolved eat time (computed in start mode). */
@@ -80,6 +88,10 @@ export interface Plan {
   fitNote?: string;
   /** Everything that blocks locking in. */
   errors: string[];
+  /** The errors that belong to one form field (each is also in errors). */
+  fieldErrors: Partial<Record<PlanField, string>>;
+  /** Set when the first step is already in the past (blocks locking in unless alreadyStarted). */
+  pastStart?: Date;
   /** The rise path this plan uses: true when it is the fridge rise. */
   coldBulk: boolean;
 }
@@ -102,7 +114,30 @@ export function defaultStageH(f: Formula, coldBulk = false): number {
   return f.process.stageH ?? getPreset(f.id)?.process.stageH ?? f.anchors[f.anchors.length - 1]?.hours ?? 0;
 }
 
+/** Impossible inputs, found before any math: a blank, zero or negative value where the math needs a real one. */
+function inputProblems(raw: PlanInput): Partial<Record<PlanField, string>> {
+  const out: Partial<Record<PlanField, string>> = {};
+  const fin = Number.isFinite;
+  const bread = productOf(raw.formula) === 'bread';
+  const unit = bread ? 'loaf' : 'ball';
+  if (raw.balls.some((b) => !fin(b.count) || b.count < 0 || !Number.isInteger(b.count))) out.balls = `Each ${unit} count must be a whole number, 0 or more.`;
+  else if (raw.balls.some((b) => b.count > 0 && (!fin(b.grams) || b.grams <= 0))) out.balls = `Each ${unit} must weigh more than 0 g.`;
+  else if (raw.balls.every((b) => b.count <= 0)) out.balls = bread ? 'Add at least one loaf.' : 'Add at least one dough ball.';
+  if (!fin(raw.eatAt.getTime()) || (raw.startAt && !fin(raw.startAt.getTime()))) out.time = 'Pick a date and time.';
+  if (!fin(raw.roomF)) out.room = 'Enter the room temperature.';
+  if (raw.riseF !== undefined && !fin(raw.riseF)) out.rise = 'Enter a number, or leave it blank.';
+  if (raw.stageH !== undefined && (!fin(raw.stageH) || raw.stageH <= 0)) out.stage = 'Enter a time above 0 hours.';
+  if (raw.manualYeastPct !== undefined && (!fin(raw.manualYeastPct) || raw.manualYeastPct < 0)) out.yeast = 'Enter a yeast amount of 0 or more.';
+  if (!fin(raw.formula.hydration) || raw.formula.hydration <= 0) out.hydration = 'Hydration must be above 0%.';
+  if (!fin(raw.formula.salt) || raw.formula.salt < 0) out.salt = 'Salt must be 0% or more.';
+  if (raw.kitchenFactor !== undefined && (!fin(raw.kitchenFactor) || raw.kitchenFactor <= 0)) {
+    out.kitchen = 'The kitchen adjustment in Settings must be above 0.';
+  }
+  return out;
+}
+
 export function planBatch(raw: PlanInput): Plan {
+  const fieldErrors = inputProblems(raw);
   const f = raw.formula;
   const timing = raw.startAt ? (raw.timing ?? 'eat') : 'eat';
   const bread = productOf(f) === 'bread';
@@ -152,7 +187,8 @@ export function planBatch(raw: PlanInput): Plan {
   // No source gives a dose for 2-3 days cold (docs/sources/cold-proof.md), so the rate law is not applied.
   const book = cold ? f.anchors[f.anchors.length - 1] : undefined;
   const yeastStage = book ? { hours: book.hours, tempF: book.tempF } : { hours: stageH, tempF: input.riseF ?? input.roomF };
-  let yeast = chooseYeast(f, yeastStage, { kitchenFactor: input.kitchenFactor, manualPct: input.manualYeastPct });
+  // The kitchen adjustment is for a counter rise; the fridge dose is the book's, never scaled (CJ's rule).
+  let yeast = chooseYeast(f, yeastStage, { kitchenFactor: book ? undefined : input.kitchenFactor, manualPct: input.manualYeastPct });
   if (book && yeast.basis === 'book') {
     yeast = {
       ...yeast,
@@ -168,6 +204,8 @@ export function planBatch(raw: PlanInput): Plan {
       note: `${OONI_SOURCE}. Ooni's dose for its own dough, used for this one as is.`,
     };
   }
+  // Ooni gives its own active dry figure, so it is used rather than converted from instant.
+  const activeDryPct = pizzaCold && input.manualYeastPct === undefined ? OONI_ACTIVE_DRY_G / OONI_FLOUR_G : undefined;
   if (fitAnchor) {
     // Only claim the book's yeast when that is what was chosen (a cooler rise gives an estimate).
     fitNote =
@@ -182,6 +220,7 @@ export function planBatch(raw: PlanInput): Plan {
     balls: input.balls,
     residuePct: input.residuePct,
     yeastType: yeast.basis === 'manual' ? 'instant' : input.yeastType,
+    activeDryPct,
   });
   const water = waterTemps(f, input.roomF, input.temp);
   const amounts = { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour };
@@ -199,8 +238,24 @@ export function planBatch(raw: PlanInput): Plan {
     amounts,
   });
 
-  const errors = [...recipe.errors, ...schedule.errors];
-  if (input.balls.every((b) => b.count <= 0)) errors.push(bread ? 'Add at least one loaf.' : 'Add at least one dough ball.');
+  // Rise temperatures far from the book can scale the yeast to nothing; don't hand out a recipe with no yeast.
+  const yeastG = recipe.totals.find((x) => x.key === 'yeast')?.grams ?? 0;
+  if (Object.keys(fieldErrors).length === 0 && yeast.basis !== 'manual' && !(yeastG >= 0.005)) {
+    fieldErrors.rise ??= 'At this rise temperature the yeast works out to 0 g. Check the temperature.';
+  }
+  let pastStart: Date | undefined;
+  const first = schedule.steps[0]?.at;
+  // A minute's grace so a plan made "now" isn't refused for the seconds spent on the form.
+  if (raw.now && !raw.alreadyStarted && first && first.getTime() < raw.now.getTime() - 60_000) {
+    pastStart = first;
+    fieldErrors.time ??= 'The first step is already in the past.';
+  }
+  const errors = [...new Set(Object.values(fieldErrors))];
+  // Bad inputs make the rest meaningless (NaN times and grams), so only their messages are shown.
+  if (errors.length && Object.keys(fieldErrors).some((k) => k !== 'time' || !pastStart)) {
+    return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors, fieldErrors, pastStart, coldBulk: cold || pizzaCold };
+  }
+  errors.push(...recipe.errors, ...schedule.errors);
   if (pizzaCold && timing === 'both') errors.push('The fridge rise has a set counter rest after the fridge, so pick a start time or a bake time, not both.');
   if (pizzaCold && (stageH < PIZZA_COLD_MIN_H || stageH > PIZZA_COLD_MAX_H)) {
     errors.push(`Fridge time is ${PIZZA_COLD_MIN_H}-${PIZZA_COLD_MAX_H} hours (Ooni).`);
@@ -211,5 +266,5 @@ export function planBatch(raw: PlanInput): Plan {
   }
   if (yeast.basis === 'manual' && yeast.pct <= 0) errors.push(yeast.warning ?? 'Enter a yeast amount.');
 
-  return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors, coldBulk: cold || pizzaCold };
+  return { input, stageH, yeast, recipe, water, schedule, window, fitNote, errors, fieldErrors, pastStart, coldBulk: cold || pizzaCold };
 }

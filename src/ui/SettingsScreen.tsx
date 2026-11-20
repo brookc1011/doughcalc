@@ -2,11 +2,25 @@ import { HELP_COPY, WATER_SOURCES } from './helpCopy';
 import { useState } from 'react';
 import { exportBackup, fmtWhen, getSettings, importBackup, setReminderLead, updateSettings, type Settings } from '../api';
 import type { Route } from './App';
-import { cToF, fToC, Info, NumField, shareOrDownload } from './common';
+import { cToF, FieldError, fToC, Info, NumField, shareOrDownload } from './common';
 
 export function SettingsScreen({ settings, onChange, go }: { settings: Settings; onChange: () => void; go: (r: Route) => void }) {
   const [s, setS] = useState(settings);
   const [newOven, setNewOven] = useState('');
+  /** A number that can't be saved, by field. The stored value stays as it was until the box holds a good one. */
+  const [bad, setBad] = useState<Record<string, string>>({});
+  const ABOVE_0 = 'Must be above 0.';
+  const ZERO_UP = 'Must be 0 or more.';
+  /** Saves only when ok; otherwise shows msg under the field and keeps what is stored. */
+  const guard = (key: string, ok: boolean, msg: string, then: () => void) => {
+    setBad((cur) => {
+      const next = { ...cur };
+      if (ok) delete next[key];
+      else next[key] = msg;
+      return next;
+    });
+    if (ok) then();
+  };
   const unit = s.unit;
   const show = (f: number) => Math.round(unit === 'F' ? f : fToC(f));
   const store = (v: string) => (unit === 'F' ? Number(v) : cToF(Number(v)));
@@ -38,29 +52,33 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
             Warm-up out of the fridge (hours)
             <Info label="warm-up time">{HELP_COPY["warm-up time"]}</Info>
           </span>
-          <NumField value={s.warmUpH} onValue={(n) => save({ warmUpH: n })} />
+          <NumField value={s.warmUpH} onValue={(n) => guard('warmUpH', n >= 0, ZERO_UP, () => save({ warmUpH: n }))} aria-invalid={!!bad.warmUpH} />
         </label>
+        <FieldError msg={bad.warmUpH} />
         <label>
           <span>
             Kitchen adjustment (yeast multiplier)
             <Info label="kitchen adjustment">{HELP_COPY["kitchen adjustment"]}</Info>
           </span>
-          <NumField value={s.kitchenFactor} onValue={(n) => save({ kitchenFactor: n })} />
+          <NumField value={s.kitchenFactor} onValue={(n) => guard('kitchenFactor', n > 0, ABOVE_0, () => save({ kitchenFactor: n }))} aria-invalid={!!bad.kitchenFactor} />
         </label>
+        <FieldError msg={bad.kitchenFactor} />
         <label>
           <span>
             Oven preheat (minutes)
             <Info label="preheat time">{HELP_COPY["preheat time"]}</Info>
           </span>
-          <NumField value={s.preheatMin ?? 60} onValue={(n) => save({ preheatMin: n })} />
+          <NumField value={s.preheatMin ?? 60} onValue={(n) => guard('preheatMin', n >= 0, ZERO_UP, () => save({ preheatMin: n }))} aria-invalid={!!bad.preheatMin} />
         </label>
+        <FieldError msg={bad.preheatMin} />
         <label>
           <span>
             Stand mixer time (minutes)
             <Info label="mixer time">{HELP_COPY["mixer time"]}</Info>
           </span>
-          <NumField value={s.mixerMin ?? 5} onValue={(n) => save({ mixerMin: n })} />
+          <NumField value={s.mixerMin ?? 5} onValue={(n) => guard('mixerMin', n > 0, ABOVE_0, () => save({ mixerMin: n }))} aria-invalid={!!bad.mixerMin} />
         </label>
+        <FieldError msg={bad.mixerMin} />
       </section>
 
       <section className="card">
@@ -72,13 +90,17 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
           </span>
           <NumField
             value={s.reminderLeadMin ?? 0}
-            onValue={async (n) => {
-              const next = await setReminderLead(n);
-              setS(next);
-              onChange();
-            }}
+            onValue={(n) =>
+              guard('reminderLeadMin', n >= 0, ZERO_UP, async () => {
+                const next = await setReminderLead(n);
+                setS(next);
+                onChange();
+              })
+            }
+            aria-invalid={!!bad.reminderLeadMin}
           />
         </label>
+        <FieldError msg={bad.reminderLeadMin} />
       </section>
 
       <section className="card">
@@ -101,23 +123,25 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <div className="row">
           <label className="grow">
             From (°{unit})
-            <NumField value={show(s.bandLowF)} onValue={(n) => save({ bandLowF: store(String(n)) })} />
+            <NumField value={show(s.bandLowF)} onValue={(n) => guard('band', store(String(n)) <= s.bandHighF, 'From must be at or below To.', () => save({ bandLowF: store(String(n)) }))} aria-invalid={!!bad.band} />
           </label>
           <label className="grow">
             To (°{unit})
-            <NumField value={show(s.bandHighF)} onValue={(n) => save({ bandHighF: store(String(n)) })} />
+            <NumField value={show(s.bandHighF)} onValue={(n) => guard('band', store(String(n)) >= s.bandLowF, 'From must be at or below To.', () => save({ bandHighF: store(String(n)) }))} aria-invalid={!!bad.band} />
           </label>
         </div>
+        <FieldError msg={bad.band} />
         <div className="row">
           <label className="grow">
             Hand friction (°F)
-            <NumField value={s.frictionHandF} onValue={(n) => save({ frictionHandF: n })} />
+            <NumField value={s.frictionHandF} onValue={(n) => guard('friction', n >= 0, ZERO_UP, () => save({ frictionHandF: n }))} aria-invalid={!!bad.friction} />
           </label>
           <label className="grow">
             Mixer friction (°F)
-            <NumField value={s.frictionMixerF} onValue={(n) => save({ frictionMixerF: n })} />
+            <NumField value={s.frictionMixerF} onValue={(n) => guard('friction', n >= 0, ZERO_UP, () => save({ frictionMixerF: n }))} aria-invalid={!!bad.friction} />
           </label>
         </div>
+        <FieldError msg={bad.friction} />
         <p className="muted small">Defaults are assumptions inside King Arthur's ranges: 0-4°F gentle folds, 22-24°F KitchenAid.</p>
       </details>
 

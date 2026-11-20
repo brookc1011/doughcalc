@@ -3,7 +3,7 @@
 import { readyTally, suggestions, topSuggestion, type ReadyTally, type Suggestion, type Survey } from './engine/advice';
 import { googleCalendarLink, stepsToIcs } from './engine/calendar';
 import { rescaleBall, roundArea } from './engine/geometry';
-import { coldOk, defaultStageH, planBatch, timingModes, type Plan, type TimingMode } from './engine/plan';
+import { coldOk, defaultStageH, planBatch, timingModes, type Plan, type PlanField, type TimingMode } from './engine/plan';
 import { DEFAULT_EAT_HOUR, defaultBalls, isPresetId, PRESETS, STYLE_TF, STYLE_TF_SOURCE } from './engine/presets';
 import type { Step } from './engine/schedule';
 import { productOf, type BallGroup, type DoughDefaults, type Formula, type Ingredient, type Product } from './engine/types';
@@ -16,6 +16,10 @@ import { ACTIVE_DRY_SOURCE, type YeastType } from './engine/formula';
 
 export type { Actual, BakeSession, Batch, BallGroup, Flour, YeastType, DoughDefaults, Formula, Ingredient, Oven, Plan, Product, Progress, ProgressStep, ReadyTally, Settings, Suggestion, Survey, TimingMode };
 export type { Crust, Crumb, Loaf } from './engine/advice';
+export type { PlanField };
+
+/** A refusal with a message meant for the baker (the screen shows it as written). */
+export class UserError extends Error {}
 export { ACTIVE_DRY_SOURCE, PRESETS, STYLE_TF, STYLE_TF_SOURCE, suggestions, topSuggestion, productOf, timingModes };
 
 /** Backup reminder cadence, in bake sessions. */
@@ -189,10 +193,14 @@ export interface PlanForm {
   flour?: Flour;
   /** Fridge rise: bread 2-3 days; straight pizza doughs, Ooni's 24-72 h. */
   coldBulk?: boolean;
+  /** Recording a bake already under way: a first step in the past is allowed. */
+  alreadyStarted?: boolean;
 }
 
 export function makePlan(form: PlanForm, s: Settings): Plan {
   return planBatch({
+    now: new Date(),
+    alreadyStarted: form.alreadyStarted,
     formula: form.formula,
     balls: form.balls,
     eatAt: form.eatAt,
@@ -326,6 +334,8 @@ export function batchProgress(b: Batch): Progress {
 
 /** Check a step off (now, or at a time you pick). Mix and ball also fill the "what happened" times. */
 export async function checkStep(batchId: string, key: string, at: Date = new Date()): Promise<Batch> {
+  // A minute's grace for a phone clock read a moment earlier.
+  if (at.getTime() > Date.now() + 60_000) throw new UserError('That time is in the future. Pick a time up to now.');
   const b = await store.getBatch(batchId);
   if (!b) throw new Error('Batch not found');
   const iso = at.toISOString();
@@ -641,12 +651,9 @@ export async function flourHistory(): Promise<{ flour: Flour; label: string; bak
 }
 
 // ---------- calendar ----------
-function stepsOf(b: Batch): Step[] {
-  return b.planned.steps.map((s) => ({ ...s, key: s.key as Step['key'], at: new Date(s.at) }));
-}
-
+/** The calendar gets the steps as re-timed by what has been checked off, not the original plan. */
 export function batchIcs(b: Batch): string {
-  return stepsToIcs(stepsOf(b), b.planned.formula.name, b.id);
+  return stepsToIcs(batchProgress(b).steps, b.planned.formula.name, b.id);
 }
 
 export function planIcs(plan: Plan): string {

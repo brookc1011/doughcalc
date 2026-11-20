@@ -6,7 +6,12 @@ import { HistoryScreen } from './HistoryScreen';
 import { PlanScreen } from './PlanScreen';
 import { SettingsScreen } from './SettingsScreen';
 
-type RepeatBake = Pick<Batch['planned'], 'formula' | 'balls' | 'mixer' | 'yeastType' | 'flour' | 'coldBulk'>;
+type RepeatBake = Pick<Batch['planned'], 'formula' | 'balls' | 'mixer' | 'yeastType' | 'flour' | 'coldBulk' | 'riseF'> & {
+  /** Fridge hours, carried only for a fridge rise. */
+  stageH?: number;
+  /** A yeast % you typed in by hand last time (as a fraction). */
+  manualYeastPct?: number;
+};
 
 export type Route =
   | { name: 'plan'; fromBatch?: string; repeat?: RepeatBake }

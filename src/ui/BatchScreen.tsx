@@ -25,6 +25,7 @@ import {
   suggestions,
   uncheckStep,
   updateActual,
+  UserError,
   type Batch,
   type Settings,
   type StepTimer,
@@ -121,7 +122,11 @@ export function BatchScreen({
       <button className="small" onClick={() => go({
         name: 'plan',
         fromBatch: batch.id,
-        repeat: { formula: p.formula, balls: p.balls, mixer: p.mixer, yeastType: p.yeastType, flour: p.flour, coldBulk: p.coldBulk },
+        repeat: {
+          formula: p.formula, balls: p.balls, mixer: p.mixer, yeastType: p.yeastType, flour: p.flour, coldBulk: p.coldBulk, riseF: p.riseF,
+          stageH: p.coldBulk ? p.stageH : undefined,
+          manualYeastPct: p.yeast.basis === 'manual' && p.yeast.pct > 0 ? p.yeast.pct : undefined,
+        },
       })}>Same dough again</button>
 </section>
 
@@ -272,8 +277,8 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
     setErr('');
     try {
       onChange(await action());
-    } catch {
-      setErr('Couldn’t save that. Nothing changed. Try again.');
+    } catch (e) {
+      setErr(e instanceof UserError ? e.message : 'Couldn’t save that. Nothing changed. Try again.');
     }
   };
 
@@ -349,6 +354,12 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
         </p>
       )}
 
+      {prog.warnings.map((w) => (
+        <p className="warn" role="status" key={w}>
+          {w}
+        </p>
+      ))}
+
       {err && (
         <p className="warn" role="alert">
           {err}
@@ -371,6 +382,9 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                 )}
               </div>
               <div className="step-time">{stepTimeText(s, firstUntouched === s.key, fmtWhen)}</div>
+              {s.outOfOrder && (
+                <div className="muted small step-note">Checked off before a step that comes ahead of it. That’s allowed; use Undo if the time is wrong.</div>
+              )}
               {firstUntouched === s.key && (
                 <div className="muted small">
                   Planned for {fmtWhen(s.at)}. The steps after it follow from when you tap Done.
@@ -402,6 +416,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                       type="datetime-local"
                       aria-label={`When you did: ${s.label}`}
                       value={pickAt}
+                      max={toLocalInput(new Date())}
                       onChange={(e) => setPickAt(e.target.value)}
                     />
                   </label>

@@ -20,6 +20,7 @@ async function lockOne() {
       eatAt: new Date('2026-11-07T18:00:00'),
       roomF: 70,
       mixer: 'hand',
+      alreadyStarted: true,
       mixAt: new Date('2026-11-06T19:00:00'),
     },
     s,
@@ -178,7 +179,7 @@ describe('bake help: method, preheat, yeast, flour', () => {
     const s = await api.getSettings();
     const formula = await api.findDough(s.lastDoughId);
     return api.makePlan(
-      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer, mixAt: new Date('2026-11-06T19:00:00'), yeastType },
+      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer, mixAt: new Date('2026-11-06T19:00:00'), yeastType, alreadyStarted: true },
       s,
     );
   }
@@ -276,7 +277,7 @@ describe('bake help: method, preheat, yeast, flour', () => {
     const s = await api.getSettings();
     const formula = await api.findDough(s.lastDoughId);
     const p = api.makePlan(
-      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand', mixAt: new Date('2026-11-06T19:00:00'), flour: 'ap' },
+      { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand', mixAt: new Date('2026-11-06T19:00:00'), flour: 'ap', alreadyStarted: true },
       s,
     );
     expect(p.schedule.steps[0].detail).toContain('King Arthur says to use less water');
@@ -333,7 +334,7 @@ describe('bake help: method, preheat, yeast, flour', () => {
   it('rise temperature sets the yeast, is stored on the batch, and is not saved as a default', async () => {
     const s = await api.getSettings();
     const formula = await api.findDough(s.lastDoughId);
-    const form = { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand' as const, mixAt: new Date('2026-11-06T19:00:00') };
+    const form = { formula, balls: s.lastBalls, eatAt: new Date('2026-11-07T18:00:00'), roomF: 70, mixer: 'hand' as const, mixAt: new Date('2026-11-06T19:00:00'), alreadyStarted: true };
     const warm = api.makePlan(form, s);
     const cool = api.makePlan({ ...form, riseF: 65 }, s);
     expect(cool.yeast.pct).toBeGreaterThan(warm.yeast.pct);

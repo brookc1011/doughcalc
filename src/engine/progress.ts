@@ -31,6 +31,8 @@ export interface ProgressStep extends Step {
   doneAt?: Date;
   /** Not checked off, but a later step is, so it's behind you. */
   passed?: boolean;
+  /** Checked off at a time before a step that comes ahead of it in the plan. Allowed; the screen notes it. */
+  outOfOrder?: boolean;
 }
 
 export interface Progress {
@@ -42,6 +44,8 @@ export interface Progress {
   /** First step not yet checked off. */
   nextKey?: string;
   errors: string[];
+  /** Things to know that don't stop the bake (e.g. a fridge time past the source's limit). */
+  warnings: string[];
 }
 
 const H = 3600_000;
@@ -87,8 +91,16 @@ function replanPizzaCold(input: ProgressInput, done: Record<string, Date>, mixAt
   const f = input.formula;
   const fridgeIn = done.fold ?? new Date(mixAt.getTime() + f.process.foldAfterMin * M);
   const planned = input.eatAt.getTime() - PIZZA_COLD_REST_H * H;
-  const t = Math.min(Math.max(planned, fridgeIn.getTime() + PIZZA_COLD_MIN_H * H), fridgeIn.getTime() + PIZZA_COLD_MAX_H * H);
+  // Dinner stays put when the tub went in early (CJ, 2026-11-20); only a too-short fridge time moves it later.
+  const t = Math.max(planned, fridgeIn.getTime() + PIZZA_COLD_MIN_H * H);
   const ballAt = done.ball ?? new Date(t);
+  const warnings: string[] = [];
+  const fridgeH = (ballAt.getTime() - fridgeIn.getTime()) / H;
+  if (!done.ball && fridgeH > PIZZA_COLD_MAX_H + 1e-9) {
+    warnings.push(
+      `The tub would be in the fridge ${Math.round(fridgeH)} hours, past Ooni's ${PIZZA_COLD_MAX_H}. Dinner stays where it is; take the tub out earlier if you can.`,
+    );
+  }
   const eatAt = new Date(ballAt.getTime() + PIZZA_COLD_REST_H * H);
   // Mix is pinned; the fold may have been late or early, so the schedule's fold follows the checked time.
   const sch = buildSchedule({
@@ -104,7 +116,7 @@ function replanPizzaCold(input: ProgressInput, done: Record<string, Date>, mixAt
     coldBulk: true,
   });
   const moved = Math.abs(eatAt.getTime() - input.eatAt.getTime()) > 1000;
-  return withDone(sch, done, eatAt, moved ? eatAt : undefined);
+  return withDone(sch, done, eatAt, moved ? eatAt : undefined, warnings);
 }
 
 /**
@@ -147,8 +159,16 @@ function replanBread(input: ProgressInput, done: Record<string, Date>): Progress
   return withDone(sch, done, moved ? bake : input.eatAt, moved ? bake : undefined);
 }
 
-function withDone(sch: Schedule, done: Record<string, Date>, eatAt: Date, movedTo: Date | undefined): Progress {
-  const steps: ProgressStep[] = sch.steps.map((s) => (done[s.key] ? { ...s, at: done[s.key], doneAt: done[s.key] } : s));
+function withDone(sch: Schedule, done: Record<string, Date>, eatAt: Date, movedTo: Date | undefined, warnings: string[] = []): Progress {
+  // In plan order, a check-off earlier than one ahead of it in the plan is out of order.
+  let latest = -Infinity;
+  const steps: ProgressStep[] = sch.steps.map((s) => {
+    const at = done[s.key];
+    if (!at) return s;
+    const outOfOrder = at.getTime() < latest;
+    latest = Math.max(latest, at.getTime());
+    return outOfOrder ? { ...s, at, doneAt: at, outOfOrder } : { ...s, at, doneAt: at };
+  });
   steps.sort((a, b) => a.at.getTime() - b.at.getTime());
   // Unchecked steps before the latest checked one are behind you (e.g. you skipped ticking the autolyse).
   const last = steps.reduce((i, s, j) => (s.doneAt ? j : i), -1);
@@ -156,5 +176,5 @@ function withDone(sch: Schedule, done: Record<string, Date>, eatAt: Date, movedT
     if (j < last && !s.doneAt) s.passed = true;
   });
   const next = steps.find((s, j) => j > last && !s.doneAt);
-  return { steps, eatAt, movedTo, nextKey: next?.key, errors: sch.errors };
+  return { steps, eatAt, movedTo, nextKey: next?.key, errors: sch.errors, warnings };
 }

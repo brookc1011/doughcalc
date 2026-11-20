@@ -925,3 +925,9 @@ ol.checklist-steps li.done:has(.bulk-room) { opacity: 1; }
 .rating-card [hidden] { display: none; }
 
 .proof-timing { margin-top: .5rem; }
+
+/* Phase 2: a problem shown under the field it belongs to. */
+.field-error { margin: 6px 0 0; font-size: .9rem; }
+.started-check { display:flex; align-items:center; gap:10px; min-height:44px; font-weight:400; }
+.started-check input { width:22px; height:22px; margin:0; }
+.step-note { margin-top: 4px; }

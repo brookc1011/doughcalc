@@ -114,7 +114,7 @@ describe('rise path is recorded and compared', () => {
 
   it('lock in keeps coldBulk for pizza; history keeps room and fridge apart', async () => {
     const s = await api.getSettings();
-    const form = { formula: overnight, balls, eatAt: dinner, roomF: 70, mixer: 'hand' as const };
+    const form = { formula: overnight, balls, eatAt: dinner, roomF: 70, mixer: 'hand' as const, alreadyStarted: true };
     const fridge = await api.lockIn(api.makePlan({ ...form, coldBulk: true }, s), 'hand');
     const room = await api.lockIn(api.makePlan(form, s), 'hand');
     expect(fridge.planned.coldBulk).toBe(true);

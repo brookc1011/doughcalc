@@ -17,6 +17,8 @@ type NumFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCh
   onValue: (n: number) => void;
   /** Show the number rounded to whole units (the stored value is untouched until you type). */
   whole?: boolean;
+  /** Called when the box is cleared. Without it, the last number is kept and comes back when you leave the box. */
+  onBlank?: () => void;
 };
 
 /**
@@ -24,12 +26,12 @@ type NumFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCh
  * no leading zeros ("02"), and tapping it selects the number so you can type over it.
  * The last valid number is kept while the box is blank and restored if you leave it blank.
  */
-export function NumField({ value, onValue, onFocus, onBlur, whole, ...rest }: NumFieldProps) {
-  const show = (n: number) => String(whole ? Math.round(n) : n);
+export function NumField({ value, onValue, onFocus, onBlur, whole, onBlank, ...rest }: NumFieldProps) {
+  const show = (n: number) => (Number.isNaN(n) ? '' : String(whole ? Math.round(n) : n));
   const [text, setText] = useState(show(value));
 
   useEffect(() => {
-    if (text === '' || Number(text) !== value) setText(show(value));
+    if (Number.isNaN(value) ? text !== '' && !Number.isNaN(Number(text)) : text === '' || Number(text) !== value) setText(show(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -49,9 +51,10 @@ export function NumField({ value, onValue, onFocus, onBlur, whole, ...rest }: Nu
         const raw = e.target.value.replace(',', '.').replace(/[^\d.-]/g, '').replace(/^0+(?=\d)/, '');
         setText(raw);
         if (raw !== '' && !Number.isNaN(Number(raw))) onValue(Number(raw));
+        else if (raw === '') onBlank?.();
       }}
       onBlur={(e) => {
-        if (text === '' || Number.isNaN(Number(text))) setText(show(value));
+        if ((text === '' && !onBlank) || Number.isNaN(Number(text))) setText(show(value));
         onBlur?.(e);
       }}
     />
@@ -173,6 +176,12 @@ export function toLocalInput(d: Date): string {
  * Small "i" next to a label. Tap to show a short explanation, tap again to hide.
  * A span (not a button) so tapping the label text still focuses the input, not this.
  */
+/** A problem with one field, shown right under it. */
+export function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <p className="warn field-error" role="alert">{msg}</p>;
+}
+
 export function Info({ children, links, label = 'this field' }: {
   children: React.ReactNode;
   links?: { href: string; text: string }[];

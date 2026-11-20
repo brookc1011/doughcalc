@@ -59,10 +59,11 @@ export const PIZZA_COLD_MAX_H = 72;
 /** Default fridge time: 2 days, the start of the 2-3 days CJ asked for (2026-11-20). An editable setting. */
 export const PIZZA_COLD_DEFAULT_H = 48;
 export { PIZZA_COLD_REST_H };
-/** Ooni's yeast: 1.4 g instant yeast for 607 g "00" flour. */
+/** Ooni's yeast: 1.4 g instant yeast (or 1.6 g active dry) for 607 g "00" flour. */
 export const OONI_YEAST_G = 1.4;
+export const OONI_ACTIVE_DRY_G = 1.6;
 export const OONI_FLOUR_G = 607;
-export const OONI_SOURCE = 'Ooni cold-proof pizza dough: 1.4 g instant yeast to 607 g flour, 24-72 h in the fridge';
+export const OONI_SOURCE = 'Ooni cold-proof pizza dough: 1.4 g instant yeast (or 1.6 g active dry) to 607 g flour, 24-72 h in the fridge';
 
 /** Whether a dough can take the pizza fridge rise: straight pizza doughs (Ooni's is a straight dough). */
 export function pizzaColdOk(f: Formula): boolean {

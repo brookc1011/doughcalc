@@ -24,13 +24,18 @@ import {
   type YeastType,
 } from '../api';
 import type { Route } from './App';
-import { Chips, cToF, download, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
+import { Chips, cToF, download, FieldError, fToC, Info, NumField, RecipeView, Timeline, toLocalInput } from './common';
 
 /** Fridge rise: move the bake a day at a time, same clock time, until it is at least 3 days out (the longest fridge time), so the first step isn't in the past. */
 function fridgeBake(d: Date): Date {
   const out = new Date(d);
   while (out.getTime() - Date.now() < 3 * 24 * 3600_000) out.setDate(out.getDate() + 1);
   return out;
+}
+
+/** Why the fridge rise moved the bake date. */
+function fridgeNote(to: Date): string {
+  return `Moved the bake to ${fmtWhen(to)} so the dough has its full fridge time.`;
 }
 
 function tomorrowAt(hour: number, minute = 0): Date {
@@ -71,9 +76,14 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   const [flour, setFlour] = useState<Flour | ''>(repeat ? repeat.flour ?? '' : settings.flour ?? '');
   const [useSnapshot, setUseSnapshot] = useState(!!repeat);
   const [details, setDetails] = useState(false);
-  const [stageH, setStageH] = useState<number | undefined>();
+  const [stageH, setStageH] = useState<number | undefined>(repeat?.coldBulk ? repeat.stageH : undefined);
   const [coldBulk, setColdBulk] = useState(!!(repeat?.coldBulk ?? (bread && repeat?.formula.defaults?.coldBulk)));
-  const [manualYeast, setManualYeast] = useState('');
+  const [manualYeast, setManualYeast] = useState(repeat?.manualYeastPct !== undefined ? String(+(repeat.manualYeastPct * 100).toFixed(4)) : '');
+  const [alreadyStarted, setAlreadyStarted] = useState(false);
+  /** Says why the app moved the bake date by itself (the fridge rise needs more days; Room puts it back). */
+  const [dateNote, setDateNote] = useState('');
+  /** The bake time before the Fridge chip moved it, so Room can put it back. */
+  const [beforeFridge, setBeforeFridge] = useState<{ was: string; movedTo: string } | null>(null);
   const [edits, setEdits] = useState<{ hydration?: number; salt?: number }>({});
   const [saving, setSaving] = useState(false);
   const [defaultsSaved, setDefaultsSaved] = useState(false);
@@ -86,7 +96,12 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
     // Bread keeps the fridge choice in its saved defaults; pizza keeps the toggle per bake (CJ, 2026-11-20).
     const cold = bread ? !!f.defaults?.coldBulk : coldBulk && coldOk(f);
     const bake = tomorrowAt(f.defaults?.eatHour ?? DEFAULT_EAT_HOUR, f.defaults?.eatMinute ?? 0);
-    if (timing === 'eat') setEatAt(toLocalInput(cold ? fridgeBake(bake) : bake));
+    if (timing === 'eat') {
+      const moved = cold ? fridgeBake(bake) : bake;
+      setEatAt(toLocalInput(moved));
+      setDateNote(cold && moved.getTime() !== bake.getTime() ? fridgeNote(moved) : '');
+      setBeforeFridge(null);
+    }
     setMixer(bread ? 'hand' : f.defaults?.mixer ?? settings.mixer);
     setColdBulk(cold);
     setStageH(undefined);
@@ -132,13 +147,14 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         yeastType,
         flour: flour || undefined,
         coldBulk: coldBulk && coldOk(f),
+        alreadyStarted,
       },
       settings,
     );
 
   const plan = useMemo(
     () => (formula ? planFor(formula) : null),
-    [formula, balls, eatAt, room, rise, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit, coldBulk],
+    [formula, balls, eatAt, room, rise, stageH, mixer, timing, startAt, manualYeast, yeastType, flour, settings, unit, coldBulk, alreadyStarted],
   );
 
   // When start and eat times don't fit this dough, list the other doughs that do.
@@ -197,6 +213,10 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
   };
 
   const cold = coldBulk && coldOk(formula);
+  // Field problems show under their field; the list at the bottom keeps the rest, and the ones inside a closed Details.
+  const visible: (keyof typeof plan.fieldErrors)[] = ['balls', 'time', 'room', 'rise', ...(details ? (['stage', 'yeast', 'hydration', 'salt'] as const) : [])];
+  const shownByField = new Set(visible.map((k) => plan.fieldErrors[k]).filter(Boolean));
+  const badInput = Object.keys(plan.fieldErrors).some((k) => k !== 'time') || (!!plan.fieldErrors.time && !plan.pastStart);
   const stageLabel = formula.family === 'poolish' ? 'Poolish ripening (hours)' : cold ? 'Fridge time (hours)' : 'Bulk ferment (hours)';
 
   return (
@@ -228,9 +248,9 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         </div>
         {balls.map((b, i) => (
           <div className="row ball" key={i}>
-            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} />
+            <NumField value={b.count} onValue={(n) => setBall(i, { count: n })} onBlank={() => setBall(i, { count: Number.NaN })} aria-invalid={!!plan.fieldErrors.balls} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: count`} />
             <span>×</span>
-            <NumField whole value={b.grams} onValue={(n) => setBall(i, { grams: n })} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} />
+            <NumField whole value={b.grams} onValue={(n) => setBall(i, { grams: n })} onBlank={() => setBall(i, { grams: Number.NaN })} aria-invalid={!!plan.fieldErrors.balls} aria-label={`${bread ? 'Loaf' : 'Ball'} group ${i + 1}: grams each`} />
             <span>g</span>
             {balls.length > 1 && (
               <button className="small" aria-label={`Remove ball group ${i + 1}`} onClick={() => setBalls(balls.filter((_, j) => j !== i))}>
@@ -239,8 +259,9 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
             )}
           </div>
         ))}
+        <FieldError msg={plan.fieldErrors.balls} />
         <div className="save-defaults-row">
-          <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved || !savedFormula}>
+          <button type="button" className="small" onClick={saveDefaults} disabled={defaultsSaved || !savedFormula || !!plan.fieldErrors.balls}>
             {defaultsSaved ? 'Saved' : 'Save defaults'}
           </button>
           <Info label="saved defaults">{bread ? 'Saves loaf sizes and bake time for this dough.' : HELP_COPY['saved defaults']}</Info>
@@ -268,7 +289,19 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
             setColdBulk(v === 'fridge');
             setStageH(undefined);
             if (v === 'fridge' && timing === 'both') setTiming('eat');
-            if (v === 'fridge' && timing === 'eat') setEatAt(toLocalInput(fridgeBake(new Date(eatAt))));
+            if (v === 'fridge' && timing === 'eat') {
+              const moved = fridgeBake(new Date(eatAt));
+              if (moved.getTime() !== new Date(eatAt).getTime()) {
+                setBeforeFridge({ was: eatAt, movedTo: toLocalInput(moved) });
+                setEatAt(toLocalInput(moved));
+                setDateNote(fridgeNote(moved));
+              }
+            }
+            if (v === 'room' && timing === 'eat' && beforeFridge && beforeFridge.movedTo === eatAt) {
+              setEatAt(beforeFridge.was);
+              setDateNote(`Back to the room rise, so the bake is back to ${fmtWhen(new Date(beforeFridge.was))}.`);
+            } else if (v === 'room') setDateNote('');
+            if (v === 'room') setBeforeFridge(null);
           }} />
           <p className="timing-hint">{bread ? (coldBulk ? 'Tub in the fridge 2-3 days after the folds.' : 'Overnight on the counter, as in the book.') : coldBulk ? 'Tub in the fridge 1-3 days, then ball (Ooni).' : 'On the counter, as the dough is written.'}</p>
         </fieldset>}
@@ -283,13 +316,21 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         {timing !== 'eat' && (
           <label>
             Start at <span className="field-hint">{formula.family === 'poolish' ? 'mixing the poolish' : 'first step'}</span>
-            <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+            <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} aria-invalid={!!plan.fieldErrors.time} />
           </label>
         )}
         {timing !== 'start' && (
           <label>
             {bread ? 'Bake at' : 'First pizza in the oven at'}
-            <input type="datetime-local" value={eatAt} onChange={(e) => setEatAt(e.target.value)} />
+            <input type="datetime-local" value={eatAt} onChange={(e) => { setEatAt(e.target.value); setDateNote(''); setBeforeFridge(null); }} aria-invalid={!!plan.fieldErrors.time} />
+          </label>
+        )}
+        {dateNote && <p className="fit-note" role="status">{dateNote}</p>}
+        <FieldError msg={plan.fieldErrors.time} />
+        {(plan.pastStart || alreadyStarted) && (
+          <label className="started-check">
+            <input type="checkbox" checked={alreadyStarted} onChange={(e) => setAlreadyStarted(e.target.checked)} />
+            Record a bake I already started
           </label>
         )}
         {bread && plan.schedule.steps.some(s => s.key === 'slice') && <dl className="bread-times">
@@ -315,8 +356,9 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
             Room temperature (°{unit})
             <Info label="room temperature">{HELP_COPY["room temperature"]}</Info>
           </span>
-          <NumField value={room} onValue={setRoom} />
+          <NumField value={room} onValue={setRoom} onBlank={() => setRoom(Number.NaN)} aria-invalid={!!plan.fieldErrors.room} />
         </label>
+        <FieldError msg={plan.fieldErrors.room} />
         <label>
           <span>
             Average room temperature over the whole rise (°{unit}) <span className="field-hint">Optional</span>
@@ -326,10 +368,15 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
             type="text"
             inputMode="decimal"
             value={rise}
-            placeholder={String(room)}
+            placeholder={Number.isNaN(room) ? '' : String(room)}
             onChange={(e) => setRise(e.target.value)}
+            aria-invalid={!!plan.fieldErrors.rise}
           />
+          {repeat?.riseF !== undefined && rise === '' && (
+            <span className="muted small">Last time: {fmtTemp(repeat.riseF, unit)}. Leave blank to use the room temperature.</span>
+          )}
         </label>
+        <FieldError msg={plan.fieldErrors.rise} />
         {plan.yeast.basis === 'estimate' && plan.input.riseF !== undefined && plan.yeast.anchor && plan.input.riseF < plan.yeast.anchor.tempF && (
           <p className="fit-note">
             Your rise is cooler than the {fmtTemp(plan.yeast.anchor.tempF, unit)}{' '}
@@ -371,7 +418,7 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         </fieldset>
       </section>
 
-      {plan.errors.map((e) => (
+      {plan.errors.filter((e) => !shownByField.has(e)).map((e) => (
         <p className="warn" role="alert" key={e}>
           {e}
         </p>
@@ -409,8 +456,9 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
                 {!cold && 'The book’s time uses the book’s yeast. Any other time scales the yeast and is labeled “estimate”.'}
               </Info>
             </span>
-            <NumField value={stageH ?? defaultStageH(formula, cold)} onValue={setStageH} />
+            <NumField value={stageH ?? defaultStageH(formula, cold)} onValue={setStageH} onBlank={() => setStageH(Number.NaN)} aria-invalid={!!plan.fieldErrors.stage} />
           </label>
+          <FieldError msg={plan.fieldErrors.stage} />
           <label>
             <span>
               Yeast % override (optional)
@@ -422,8 +470,10 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
               value={manualYeast}
               placeholder={(plan.yeast.pct * 100).toFixed(3)}
               onChange={(e) => setManualYeast(e.target.value)}
+              aria-invalid={!!plan.fieldErrors.yeast}
             />
           </label>
+          <FieldError msg={plan.fieldErrors.yeast} />
           <p className="muted small">
             Hydration and salt below change this bake only. “Save as My Dough” keeps them.
           </p>
@@ -433,13 +483,16 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
               <NumField
                 value={+(formula.hydration * 100).toFixed(1)}
                 onValue={(n) => setEdits({ ...edits, hydration: n / 100 })}
+                onBlank={() => setEdits({ ...edits, hydration: Number.NaN })}
+                aria-invalid={!!plan.fieldErrors.hydration}
               />
             </label>
             <label className="grow">
               Salt %
-              <NumField value={+(formula.salt * 100).toFixed(2)} onValue={(n) => setEdits({ ...edits, salt: n / 100 })} />
+              <NumField value={+(formula.salt * 100).toFixed(2)} onValue={(n) => setEdits({ ...edits, salt: n / 100 })} onBlank={() => setEdits({ ...edits, salt: Number.NaN })} aria-invalid={!!plan.fieldErrors.salt} />
             </label>
           </div>
+          <FieldError msg={plan.fieldErrors.hydration ?? plan.fieldErrors.salt} />
 
           {(edited || useSnapshot || isPreset(formula)) && (
             <button className="small" onClick={saveAsMine}>
@@ -449,9 +502,10 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         </section>
       )}
 
-      <RecipeView recipe={plan.recipe} yeast={plan.yeast} water={plan.water} unit={unit} />
+      {/* A bad number would show a recipe of NaN grams; a past start alone still shows it. */}
+      {!badInput && <RecipeView recipe={plan.recipe} yeast={plan.yeast} water={plan.water} unit={unit} />}
       {/* A schedule that doesn't fit would show steps out of order (balling after dinner), so hide it until it fits. */}
-      {plan.schedule.errors.length === 0 && <Timeline
+      {!badInput && plan.schedule.errors.length === 0 && <Timeline
         steps={plan.schedule.steps}
         title={formula.name}
         onIcs={() => download('dough-plan.ics', planIcs(plan), 'text/calendar')}

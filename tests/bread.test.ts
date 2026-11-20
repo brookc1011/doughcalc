@@ -137,7 +137,7 @@ describe('library by product', () => {
   it('locking in bread names loaves, mixes by hand and keeps pizza settings', async () => {
     const before = await api.getSettings();
     const s = await api.getSettings();
-    const plan = api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand' }, s);
+    const plan = api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand', alreadyStarted: true }, s);
     expect(plan.errors).toEqual([]);
     const b = await api.lockIn(plan, 'mixer');
     expect(b.title).toBe('Overnight White Bread, 2 loaves');

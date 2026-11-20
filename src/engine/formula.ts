@@ -11,6 +11,8 @@ export interface RecipeInput {
   residuePct?: number;
   /** Yeast on hand. yeastPct is always instant; active dry is converted by ACTIVE_DRY_FACTOR. */
   yeastType?: YeastType;
+  /** Active dry: a source's own active dry figure (fraction of flour), used in place of the conversion. */
+  activeDryPct?: number;
 }
 
 export type YeastType = 'instant' | 'activeDry';
@@ -58,7 +60,7 @@ function ing(formula: Formula, key: Ingredient['key'], grams: number, flourTotal
 export function computeRecipe(input: RecipeInput): Recipe {
   const { formula: f } = input;
   const activeDry = input.yeastType === 'activeDry';
-  const yeastPct = input.yeastPct * (activeDry ? ACTIVE_DRY_FACTOR : 1);
+  const yeastPct = activeDry ? input.activeDryPct ?? input.yeastPct * ACTIVE_DRY_FACTOR : input.yeastPct;
   const residue = input.residuePct ?? f.residuePct;
   const errors: string[] = [];
   const ratioSum = 1 + f.hydration + f.salt + yeastPct + f.oil + f.sugar;

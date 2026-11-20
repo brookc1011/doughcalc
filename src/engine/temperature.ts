@@ -47,7 +47,8 @@ export function waterTemps(formula: Formula, roomF: number, s: TempSettings): Wa
         ? `Stand mixer: the book's temperatures are for mixing by hand, so water is set to land the dough at ${ddt}°F (King Arthur DDT formula, friction ${s.frictionF}°F).`
         : `Room is outside ${s.bandLowF}-${s.bandHighF}°F, so water is set to land the dough at ${ddt}°F (King Arthur DDT formula, friction ${s.frictionF}°F).`,
     };
-    if (t > 115) out.warning = 'Very hot water. Above about 115°F, use the book temperature and expect a slower ferment instead.';
+    // FWSY p.65: never above 110°F, which can kill the yeast.
+    if (t > 110) out.warning = 'Very hot water. Above 110°F can kill the yeast (FWSY p.65), so use the book temperature and expect a slower ferment instead.';
     if (t < 35) out.warning = 'Ice-cold water needed. Consider a cooler spot for the bulk instead.';
     return out;
   });

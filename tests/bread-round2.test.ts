@@ -115,11 +115,11 @@ describe('fridge option is saved with the batch', () => {
 
   it('lock in keeps coldBulk and the checklist uses it', async () => {
     const s = await api.getSettings();
-    const plan = api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand', coldBulk: true }, s);
+    const plan = api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand', coldBulk: true, alreadyStarted: true }, s);
     const b = await api.lockIn(plan, 'hand');
     expect(b.planned.coldBulk).toBe(true);
     expect(api.batchProgress(b).steps.map((x) => x.key)).toContain('pull');
-    const room = await api.lockIn(api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand' }, s), 'hand');
+    const room = await api.lockIn(api.makePlan({ formula: OVERNIGHT_WHITE, balls: loaves, eatAt: bakeAt, roomF: 70, mixer: 'hand', alreadyStarted: true }, s), 'hand');
     expect('coldBulk' in room.planned).toBe(false);
   });
 });
