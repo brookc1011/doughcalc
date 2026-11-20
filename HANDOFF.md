@@ -1,6 +1,6 @@
 # UI hand-off brief (for ChatGPT)
 
-You work on the UI of a small personal dough app (pizza, and now bread). The math and storage are finished and tested. Your job is the screens: look and feel, and, when a round says so, new screens that use api calls that already exist.
+You work on the UI of a small personal dough app (pizza and bread). The math and storage are finished and tested. Your job is the screens: look and feel, and, when a round says so, new screens that use api calls that already exist.
 
 ## What you may change
 - Everything in `src/ui/` (React components and `styles.css`).
@@ -13,7 +13,7 @@ You work on the UI of a small personal dough app (pizza, and now bread). The mat
 
 ## Files in the zip
 - `src/ui/`: yours to change.
-- `readonly/`: `api.ts`, `engine/types.ts`, `engine/advice.ts`, `data/types.ts`, `package.json`, and sample output. These show every function and data shape the UI can use. Do not return them.
+- `readonly/`: `api.ts`, `engine/types.ts`, `data/types.ts`, `package.json`. These show every function and data shape the UI can use. Do not return them.
 - `screenshots/`: the current UI at phone width.
 
 ## Rules
@@ -25,16 +25,16 @@ You work on the UI of a small personal dough app (pizza, and now bread). The mat
 - iPhone Safari is a standing target: 16px inputs, 44px taps, safe-area insets.
 
 ## Screens (keep the flow, restyle freely)
-1. **Plan** (`PlanScreen.tsx`): dough picker, dough balls (count x grams, extra lines for a second size), "Plan around" (Bake at / Start at / Both) with the matching time inputs and the ready-window note, room temperature. A "Details" drawer holds mixer, ferment hours, yeast override, hydration and salt, "Save as My Dough". Below: recipe, water temperature, timeline, and the big "Lock in & start" button. In Both mode, a card lists other doughs that fit.
-2. **Batch** (`BatchScreen.tsx`): after lock-in. Steps checklist (Up next, amounts, cover, timer, Done / Choose time / Undo, "Running behind" note when the time moves, "Remind me", calendar export), Recipe, and "Rate a bake".
+1. **Plan** (`PlanScreen.tsx`): dough picker, dough balls (count x grams, extra lines for a second size), a "Room | Fridge" rise chip pair (the fridge hours show right under the Fridge chip), "Plan around" (Bake at / Start at / Both) with the matching time inputs and the ready-window note, a "Record a bake I already started" checkbox, and "Room temperature now". The optional rise temperature field (for a house that cools overnight) sits behind "Room temperature will change". Problems with a field show in red under that field. A "Details" drawer holds mixer, ferment hours, yeast override, hydration and salt, "Save as My Dough". Below: recipe, water temperature, timeline, and the big "Save bake plan" button. In Both mode, a card lists other doughs that fit.
+2. **Batch** (`BatchScreen.tsx`): after the plan is saved. Steps checklist (Up next, amounts, cover, step timers (a countdown with its source, or a stopwatch where the book gives no time), Done / Choose time / Undo, "Running behind" note when the time moves, "Remind me", calendar export), Recipe, and "Rate a bake".
 3. **Bakes** (`HistoryScreen.tsx`): "Try next time" card, per-dough averages with a trend line, timing tally, all batches.
-4. **Settings** (`SettingsScreen.tsx`): units, warm-up hours, kitchen yeast multiplier, water-temperature band and friction, ovens, backup and restore.
+4. **Settings** (`SettingsScreen.tsx`): units, warm-up hours, reminder heads-up time (minutes before each step), kitchen yeast multiplier, water-temperature band and friction, ovens, backup and restore.
 5. **Doughs** (`DoughsScreen.tsx`): the dough library (book and mine), edit, clone, hide, reset.
 
 The small "i" buttons (`Info` in `common.tsx`) hold short explanations; keep their text and links.
 
 ## Bread (added 2026-11-13)
-Bread lives in the same app and the same flow: plan, lock in, checklist, rate, Bakes. The first bread is Forkish's Overnight White (FWSY p.89), yeast only. `readonly/bread-plan-sample.json` is real output for it.
+Bread lives in the same app and the same flow: plan, save the bake plan, checklist, rate, Bakes. The first bread is Forkish's Overnight White (FWSY p.89), yeast only.
 
 What the api offers for bread:
 - `Product` is `'pizza' | 'bread'`. `productOf(formula)` tells which a dough is (a dough with no `product` is pizza).
@@ -43,6 +43,12 @@ What the api offers for bread:
 - `lastDoughId(product)` is the dough to open on. `settings.lastLoaves` (may be missing) is the last loaves locked in; fall back to the dough's `defaults.balls`.
 - `timingModes(formula)` lists the "Plan around" choices a dough allows. Bread returns `['eat', 'start']`: no Both.
 - `makePlan` and `lockIn` are unchanged. For bread, `balls` are loaves (`label: 'loaf'`), `eatAt` is when the loaves go in the oven, and `lockIn` always records hand mixing and titles the batch "N loaves".
+
+### Bread round 2 (2026-11-20)
+- Oil goes in the mix step (with the salt and yeast, after the autolyse).
+- Done steps keep their instructions on screen (the code calls these done-step instructions).
+- Bread has a Room | Fridge rise: after the folds the tub goes into the fridge for 2-3 days, then out to warm up, shape and proof. Pizza has the same chips, using Ooni's cold-proof method (24-72 h, then 5 h on the counter).
+- Loaf weights show in whole grams.
 - `DoughDefaults.eatMinute` (new, optional): bread's default bake time is 9:15 (book sample schedule). Use `eatMinute ?? 0` with `eatHour`.
 - Bread step keys: `autolyse`, `mix`, `fold`, `fold2`, `fold3`, `shape`, `proofCheck`, `preheat`, `bake`, `lidOff`, `out`, `slice`. The last step is `slice`, "Ready to slice".
 - `batchProgress(batch).movedTo`: for bread it is set when the bake moved earlier or later (the room proof has no hold, so a late shape moves the bake).

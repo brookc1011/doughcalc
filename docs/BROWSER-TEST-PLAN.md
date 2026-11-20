@@ -7,7 +7,7 @@ No browser dependency or test script is included. Extend the owner's existing pr
 3. Assert date fields remain inside their parent and have readable themed styles. Desktop WebKit cannot validate native iPhone wheel pickers or the on-screen keyboard.
 4. With touch/coarse-pointer emulation, focus every Plan and editor field. Check the intended static-bar CSS applies and resets on blur; check focused fields and action buttons remain reachable. This does not establish native keyboard behavior: the real device checklist remains required.
 5. Jump to Steps, Recipe and Rate. Assert activeElement is the intended section and its heading is not hidden behind navigation. Repeat near the end of a long checklist and with larger text.
-6. Exercise all timing modes, source links/info labels, save-defaults placement, lock-in, step time editing, rating with a fixture photo, Bakes, Settings and editor back navigation. Preserve existing calculations as the expected baseline.
+6. Exercise all timing modes, source links/info labels, save-defaults placement, Save bake plan, step time editing, rating with a fixture photo, Bakes, Settings and editor back navigation. Preserve existing calculations as the expected baseline.
 7. Exercise supported, unsupported, denied and unconfigured reminder capability states through the existing private harness if it supports controlled fixtures. Assert Home Screen help appears only for unsupported. A stub is not evidence of delivered push.
 8. Check history back/forward, saved-state reload and an offline reload after initial caching in an isolated profile. Capture screenshots and console errors on failure. Check an update with existing saved data separately.
 

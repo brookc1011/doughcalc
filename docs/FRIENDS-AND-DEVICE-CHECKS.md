@@ -4,7 +4,7 @@ Start with two or three friends and share an HTTPS app URL. Let each person ente
 
 ## Before inviting them
 
-- Resolve/review the reminder identity and privacy-copy findings in SAFARI-HANDOFF.md. Do not distribute a personal backup as a starter recipe.
+- Resolve/review the reminder identity and privacy-copy findings (the privacy text is in `src/ui/helpCopy.ts`; the real-iPhone run is `docs/SAFARI-CHECKLIST.md`). Do not distribute a personal backup as a starter recipe.
 - Verify export → actual saved file → restore in an isolated profile preserves doughs, bakes, ratings and photos. Try invalid JSON and an older backup; failure should leave existing data intact.
 - Check reminders with the app closed, denied permission, cancellation, re-enabling and two independent phones. Verify no duplicate/stale alerts after offline edits.
 - Tell testers data is stored locally and provide the backup path. Test an app update and offline relaunch before assuming data survives normal use.
@@ -19,7 +19,7 @@ Start with two or three friends and share an HTTPS app URL. Let each person ente
 | Larger Android, about 412px | Installed app, navigation, notification permission and background delivery |
 | Optional iPad / Samsung Internet | Wider layout and native controls if friends use these |
 
-Use current devices plus the oldest OS you intend to support. Record actual model/OS/browser, not just simulated viewport size. Run SAFARI-CHECKLIST.md on at least one real iPhone.
+Use current devices plus the oldest OS you intend to support. Record actual model/OS/browser, not just simulated viewport size. Run `docs/SAFARI-CHECKLIST.md` on at least one real iPhone.
 
 ## A second, slightly deeper pass
 

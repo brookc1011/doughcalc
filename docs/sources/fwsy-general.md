@@ -1,6 +1,6 @@
 # FWSY general notes (pizza and bread)
 
-Source: Ken Forkish, *Flour Water Salt Yeast*, from CJ's photos of the book, 2026-11-13. These are paraphrased notes and figures with page numbers, not a copy of the text. Page numbers come from the page footers. Where a footer was cut off or missing, the note says so. **Status: transcribed by Claude, not yet checked by CJ.** Nothing here goes into code until CJ has checked it.
+Source: Ken Forkish, *Flour Water Salt Yeast*, from CJ's photos of the book, 2026-11-13. These are paraphrased notes and figures with page numbers, not a copy of the text. Page numbers come from the page footers. Where a footer was cut off or missing, the note says so. **Status: Checked by CJ against the book, 2026-11-13.**
 
 Second pass (2026-11-13): every photo was re-read against these notes by three independent reviewers. No figure was wrong. Fixed: the pizza baking-stone exception, the oven-temperature claim, the log water rule, fold timing, and a few added "about"s. Missing items added and marked "(2nd pass)". Two ch. 4 pages were never photographed: p.68 (the end of the mixing instructions) and p.76 (the middle of the bake). Step 2 and Step 8 below have gaps there.
 

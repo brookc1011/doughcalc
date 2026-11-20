@@ -33,7 +33,7 @@ import {
   type Survey,
 } from '../api';
 import type { Route } from './App';
-import { StepDetail, Chips, cToF, download, fToC, Info, jumpTo, KitchenMark, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
+import { StepDetail, tempsIn, Chips, cToF, download, fToC, Info, jumpTo, KitchenMark, NumField, RecipeView, shareOrDownload, toLocalInput } from './common';
 
 export function BatchScreen({
   id,
@@ -49,7 +49,7 @@ export function BatchScreen({
   const [batch, setBatch] = useState<Batch | null>(null);
   const [missing, setMissing] = useState(false);
   const [rating, setRating] = useState(false);
-  const [result, setResult] = useState<{ suggestion?: Suggestion; backupDue: boolean } | null>(null);
+  const [result, setResult] = useState<{ suggestion?: Suggestion; backupDue: boolean; survey?: Batch['sessions'][number]['survey'] } | null>(null);
 
   useEffect(() => { if (rating) jumpTo(BATCH_TARGETS.rating); }, [rating]);
   useEffect(() => { if (result) jumpTo(BATCH_TARGETS.result); }, [result]);
@@ -106,7 +106,7 @@ export function BatchScreen({
               {result.suggestion.source && <p className="muted small">Source: {result.suggestion.source}</p>}
             </>
           ) : (
-            <p>Nothing to change. Make it again the same way.</p>
+            <p>{noAdviceText(result.survey)}</p>
           )}
           {result.backupDue && <BackupNudge onDone={onSaved} />}
         </section>
@@ -117,7 +117,7 @@ export function BatchScreen({
 <section id={BATCH_TARGETS.recipe} tabIndex={-1} aria-label="Batch recipe">
       <RecipeView recipe={p.recipe} yeast={p.yeast} water={p.water} unit={unit} />
       <p className="muted small">
-        Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}{p.riseF !== undefined ? `, rise ${fmtTemp(p.riseF, unit)}` : ''}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${FLOUR_LABELS[p.flour]} flour` : ''}, {p.coldBulk ? `fridge rise (${p.stageH} h in the fridge)` : 'room rise'}.
+        Planned to bake {fmtWhen(p.eatAt)}, room {fmtTemp(p.roomF, unit)}{p.riseF !== undefined ? `, rise ${fmtTemp(p.riseF, unit)}` : ''}, {p.mixer === 'hand' ? 'mixed by hand' : 'stand mixer'}{p.yeastType === 'activeDry' ? ', active dry yeast' : ''}{p.flour ? `, ${/flour$/i.test(FLOUR_LABELS[p.flour]) ? FLOUR_LABELS[p.flour].toLowerCase() : `${FLOUR_LABELS[p.flour]} flour`}` : ''}, {p.coldBulk ? `fridge rise (${p.stageH} h in the fridge)` : 'room rise'}.
       </p>
       <button className="small" onClick={() => go({
         name: 'plan',
@@ -138,7 +138,7 @@ export function BatchScreen({
           onSave={async (form) => {
             const r = await addSession(batch.id, form);
             setBatch(r.batch);
-            setResult({ suggestion: r.suggestion, backupDue: r.backupDue });
+            setResult({ suggestion: r.suggestion, backupDue: r.backupDue, survey: r.batch.sessions[r.batch.sessions.length - 1]?.survey });
             setRating(false);
             onSaved();
           }}
@@ -156,7 +156,7 @@ export function BatchScreen({
       {batch.sessions.length > 0 && (
         <details className="card"><summary>Bakes from this batch ({batch.sessions.length})</summary>
           {batch.sessions.map((s) => (
-            <SessionRow bread={bread} key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
+            <SessionRow bread={bread} fridge={!!p.coldBulk} key={s.id} session={s} ovenName={settings.ovens.find((o) => o.id === s.ovenId)?.name ?? ''} />
           ))}
         </details>
       )}
@@ -428,7 +428,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   </div>
                 </div>
               )}
-              {!s.doneAt && !s.passed && <div className="muted small step-detail"><StepDetail stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>}
+              {!s.doneAt && !s.passed && <div className="muted small step-detail"><StepDetail unit={unit} stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>}
               {!s.doneAt && !s.passed && s.cover && (
                 <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'Lid off while shaping'}</div>
               )}
@@ -438,7 +438,7 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
                   <dl>
                     {s.ingredients.map((x) => (
                       <div key={x.name}>
-                        <dt>{x.name}</dt><dd>{x.amount}</dd>
+                        <dt>{x.name}</dt><dd>{tempsIn(x.amount, unit)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -447,13 +447,13 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
               {(s.doneAt || s.passed) && (
                 <details className="step-amounts step-done-detail">
                   <summary className="small">Show instructions</summary>
-                  <div className="muted small step-detail"><StepDetail stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>
+                  <div className="muted small step-detail"><StepDetail unit={unit} stepKey={s.key} detail={s.cover === 'off' ? s.detail.replace(/ No cover needed while you shape\.$/, '') : s.detail} /></div>
                   {s.cover && <div className="small step-cover">{s.cover === 'on' ? 'Lid on' : 'Lid off while shaping'}</div>}
                   {!!s.ingredients?.length && (
                     <dl>
                       {s.ingredients.map((x) => (
                         <div key={x.name}>
-                          <dt>{x.name}</dt><dd>{x.amount}</dd>
+                          <dt>{x.name}</dt><dd>{tempsIn(x.amount, unit)}</dd>
                         </div>
                       ))}
                     </dl>
@@ -473,14 +473,22 @@ function Checklist({ batch, unit, onChange }: { batch: Batch; unit: 'F' | 'C'; o
   );
 }
 
-function SessionRow({ session, ovenName, bread }: { bread: boolean; session: Batch['sessions'][number]; ovenName: string }) {
+/** What the saved rating says when no answer points to a change: only a good rating earns "make it again". */
+function noAdviceText(s?: Batch['sessions'][number]['survey']): string {
+  const answered = !!s && Object.values(s).some((v) => v !== undefined);
+  if (!answered) return 'Rating saved. You didn’t answer anything, so there’s no advice for next time.';
+  if ((s.overall !== undefined && s.overall <= 2) || s.makeAgain === false) return 'Rating saved. Nothing in your answers points to one change to make.';
+  return 'Nothing to change. Make it again the same way.';
+}
+
+function SessionRow({ session, ovenName, bread, fridge }: { bread: boolean; fridge: boolean; session: Batch['sessions'][number]; ovenName: string }) {
   const [url, setUrl] = useState<string>();
   useEffect(() => {
     if (session.photoId) photoUrl(session.photoId).then(setUrl);
   }, [session.photoId]);
   const s = session.survey;
   const flags = [s.ready, s.stretch, s.rim, s.bottom, s.center, s.crust, s.loaf, s.crumb].filter((x) => x && x !== 'good' && x !== 'onTime' && x !== 'set');
-  const tips = suggestions(s);
+  const tips = suggestions(s, { fridge });
   return (
     <div className="session">
       <div className="row between">

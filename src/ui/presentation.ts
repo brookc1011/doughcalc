@@ -39,7 +39,7 @@ export function stepTimeText(
 }
 
 export const TIMING_HINTS: Record<TimingMode, string> = {
-  eat: 'Bake time is fixed. Work back to the first step.',
+  eat: 'Pick the bake time. The plan works back to the first step.',
   start: 'Start time is fixed. See when you can bake.',
   both: 'Set both times. See whether this dough fits.',
 };
@@ -58,7 +58,7 @@ export function reminderStatus(permission: Permission, remindersEnabled: boolean
 }
 
 export const HOME_SCREEN_HELP = 'On iPhone with iOS 16.4 or later: open Safari’s Share menu, choose Add to Home Screen, then open Dough from that icon. Tap Remind me and allow notifications.';
-export const READY_WINDOW_SOURCE = 'Same yeast throughout (FWSY p.219).';
+export const READY_WINDOW_SOURCE = 'Same yeast throughout (FWSY p.219). Assumption until checked: that page isn’t in the app’s source notes yet.';
 
 export function infoLabel(open: boolean, label: string): string {
   return `${open ? 'Hide' : 'Explain'} ${label}`;

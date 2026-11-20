@@ -1,7 +1,7 @@
 import type { Step } from './schedule';
 
-// Calendar export replaces in-app reminders: a closed web app on Android cannot reliably
-// fire its own notifications, but the phone's calendar can.
+// Calendar export sits beside the step reminders (worker/): it puts the steps in the phone's own
+// calendar, which works with reminders off or without a connection to the reminder server.
 
 function icsDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');

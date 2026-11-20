@@ -1,9 +1,15 @@
-# Bread and sourdough for the dough app: roadmap (planning only)
+# Bread and sourdough for the dough app: roadmap
 
 ## Context
-The app is a pizza-only calculator and bake log today. CJ wants bread, sourdough first, in the same app, with naan possibly later. Bread can use either a sourdough starter or instant/active dry yeast. A starter manager tracks CJ's starter, and a bread bake made with it shows the levain build in its amounts and steps. The flow stays the same: plan, lock in, checklist, rate, notebook. This is a roadmap. Nothing is built until CJ decides to start, and figures wait for CJ's book screenshots.
+The app started as a pizza calculator and bake log. Yeasted bread (Overnight White) now ships in the same app. CJ wants sourdough next, with naan possibly later. Bread can use either a sourdough starter or instant/active dry yeast. A starter manager tracks CJ's starter, and a bread bake made with it shows the levain build in its amounts and steps. The flow stays the same: plan, lock in, checklist, rate, notebook. This is a roadmap. Yeasted bread has shipped (status below). The starter and levain work is not built until CJ decides to start, and figures wait for CJ's book screenshots.
 
 Inputs so far: codebase map (2026-11-13), a one-seat skeptic review (central claim holds, 10 fixes applied, 1 ruled by CJ), and ChatGPT's design opinions (all adopted).
+
+## Status (2026-11-20)
+- **Done 2026-11-13: bread round 1.** Overnight White (FWSY p.89), yeast only: bread engine, loaf sizing, bread steps and timers, Dutch oven lid-on and lid-off steps, bread rating and advice, and the bread screens.
+- **Done 2026-11-20: bread round 2.** Oil in the mix step, done-step instructions, a Fridge rise option (2-3 days, book yeast dose kept, labeled as an assumption; `docs/sources/cold-proof.md`), and whole-gram loaves.
+- **Done 2026-11-20:** pizza Fridge rise (Ooni's cold-proof method), which sits outside this plan.
+- **Not built:** levain and hybrid doughs, the starter manager (phase 3 below), Pain de Campagne.
 
 ## Decided (2026-11-13)
 - FWSY is the starting set of bread presets, from CJ's screenshots. Other sources (King Arthur and others) can add presets, each with a named source. CJ can clone, edit, create and delete bread doughs, as with pizza. Book recipes are a reference point, not fixed rules. This reuses the dough library (`cloneDough`, `saveDough`, `removeDough`, `restoreDough` in `src/api.ts`), filtered by product.
@@ -69,9 +75,9 @@ A new `starters` store, added by a new `if (oldVersion < 2)` block in `src/data/
 - **Bakes.** One chronological list with a Pizza or Bread label, and an All / Pizza / Bread filter once both exist. Bread trends show only in the Bread view.
 - **Advice.** Direction only, timing first, then oven, then dough, worded for bread and tied to a book source.
 - **The test after one real loaf.** With floury hands, can CJ answer three things at a glance: what to do now, how much goes in, and when to check again?
-- **HANDOFF.md** currently says the job is "look and feel only". It needs a revision for new screens and new api calls.
+- **HANDOFF.md** was revised for bread (2026-11-13) and covers the current screens.
 
-## Book intake so far (2026-11-13, not yet checked by CJ)
+## Book intake so far (2026-11-13, checked by CJ against the book the same day)
 The intake is a reference library for research and learning, not a build list (CJ, 2026-11-13). Only what a release actually needs goes into code. The rest stays in `docs/sources/` to draw on later.
 
 General FWSY notes for both pizza and bread are in `docs/sources/fwsy-general.md` (pp.26-31, 40-43, 49-53 and the intro). What they change here:
@@ -97,12 +103,12 @@ General FWSY notes for both pizza and bread are in `docs/sources/fwsy-general.md
 - **Checks against today's pizza presets:** 75-80°F mix target (p.28) and 2% salt (p.52) both agree with what the app already uses.
 
 ## Phases (each ships on its own; pizza behavior unchanged)
-0. **Book intake.** CJ sends screenshots. Claude transcribes each recipe into `docs/sources/fwsy-bread.md` with page numbers, including levain built vs. used and any retard window. CJ checks it before any number goes into code.
-1. **Foundation.** Product kind, the leaven field, `family`/`preferment` for levain, empty anchors allowed, a `progress.ts` that doesn't assume a ball step, and product-chosen timing modes. No visible change. Guard update.
-2. **Bread engine, first release scope.** One bread recipe CJ actually bakes, loaf sizing, bread schedule, step text and timers, Dutch oven steps, the levain readiness re-time, bread survey and advice. Guard update.
-3. **Starter manager.** Store and migration 2, a straightforward feeding log, reminder slot and sync, backup and restore rules, levain build linked to a starter. Guard update.
-4. **UI hand-off to ChatGPT.** Switch, bread plan, checklist and rate screens, starter screens, Bakes filter. Imported through the usual checks.
-5. **Polish.** More bread presets, iPhone Safari checklist pass, a real bake on the phone.
+0. **Book intake.** (Done 2026-11-13; CJ checked it the same day.) CJ sends screenshots. Claude transcribes each recipe into `docs/sources/fwsy-bread.md` with page numbers, including levain built vs. used and any retard window. CJ checks it before any number goes into code (done 2026-11-13).
+1. **Foundation.** (Done 2026-11-13, with the first release.) Product kind, the leaven field, `family`/`preferment` for levain, empty anchors allowed, a `progress.ts` that doesn't assume a ball step, and product-chosen timing modes. No visible change. Guard update.
+2. **Bread engine, first release scope.** (Done 2026-11-13 for Overnight White; levain readiness re-time not built.) One bread recipe CJ actually bakes, loaf sizing, bread schedule, step text and timers, Dutch oven steps, the levain readiness re-time, bread survey and advice. Guard update.
+3. **Starter manager.** (Not started.) Store and migration 2, a straightforward feeding log, reminder slot and sync, backup and restore rules, levain build linked to a starter. Guard update.
+4. **UI hand-off to ChatGPT.** (Bread round 1 done 2026-11-13; starter screens wait for phase 3.) Switch, bread plan, checklist and rate screens, starter screens, Bakes filter. Imported through the usual checks.
+5. **Polish.** (Round 2 done 2026-11-20; more presets and a real bake on the phone remain.) More bread presets, iPhone Safari checklist pass, a real bake on the phone.
 
 Deferred: flatbreads/naan, starter charts, a permanent Starter tab, and one-Dutch-oven timing (a second oven session, the pot reheat, and a separate ready-to-slice time for each loaf; ChatGPT's bread round, 2026-11-13). The Preheat step text covers one pot in words until then.
 

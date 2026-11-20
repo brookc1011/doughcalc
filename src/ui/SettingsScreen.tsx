@@ -105,7 +105,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
 
       <section className="card">
         <h2>Doughs</h2>
-        <p className="muted small">Set how many balls each dough starts with, add your own doughs, or hide the book ones.</p>
+        <p className="muted small">Set how many balls or loaves each dough starts with, add your own doughs, or hide the book ones.</p>
         <button className="small" onClick={() => go({ name: 'doughs' })}>
           Manage doughs
         </button>
@@ -115,7 +115,7 @@ export function SettingsScreen({ settings, onChange, go }: { settings: Settings;
         <p className="small">
           Water temperature sets how warm the dough is after mixing, and that sets how fast it rises. When your room is in
           this range, use the book’s water. Outside it, the app works out a water temperature that lands the dough at the
-          book’s target.
+          book’s target. The starting range is an assumption: it doesn’t come from a named source.
           <Info label="water temperature and friction" links={WATER_SOURCES}>
             {HELP_COPY['water temperature and friction']}
           </Info>

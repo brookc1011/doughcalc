@@ -401,7 +401,8 @@ export function timerState(b: Batch, now = Date.now()) {
 // ---------- room temperature during the bulk rise ----------
 /** Ask once the fold is checked off, until answered or skipped. */
 export function wantsBulkRoomTemp(b: Batch): boolean {
-  return !!b.actual.done?.fold && b.actual.bulkRoomF === undefined && !b.actual.bulkRoomSkipped;
+  // A fridge rise doesn't use the room temperature during the rise, so it isn't asked.
+  return !b.planned.coldBulk && !!b.actual.done?.fold && b.actual.bulkRoomF === undefined && !b.actual.bulkRoomSkipped;
 }
 
 /** Record the room temperature during the bulk rise (in the app's unit), or null to skip. Stored in °F. */
@@ -572,7 +573,7 @@ export async function addSession(
     note: form.note,
     photoId,
   };
-  const suggestion = topSuggestion(form.survey);
+  const suggestion = topSuggestion(form.survey, { fridge: !!b.planned.coldBulk });
   const batch: Batch = { ...b, sessions: [...b.sessions, session], nextTry: suggestion?.text ?? b.nextTry };
   await store.saveBatch(batch);
   const s = await store.getSettings();

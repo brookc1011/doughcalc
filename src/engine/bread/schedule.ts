@@ -135,7 +135,7 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
       at: add(mix, -p.autolyseMin * M),
       detail:
         `Measure ${water ? g(water.grams) : 'the'} water at ${waterTemp}.${cup} Mix it with ${flour ? g(flour.grams) : 'the'} flour by hand in a 12-qt round tub, ` +
-        `just until there's no dry flour. Cover and rest 20-30 min.${ap}`,
+        `just until there's no dry flour. Cover and rest 20-30 min. Tap Done when the flour is mixed in: the rest starts then, and its timer counts it.${ap}`,
     });
     ingredients.autolyse = a
       ? [
@@ -226,7 +226,9 @@ export function buildBreadSchedule(input: BreadScheduleInput): Schedule {
     at: add(bake, -BREAD_PREHEAT_MIN * M),
     detail:
       `Rack in the middle, ${loaves > 1 ? 'the Dutch ovens' : 'the Dutch oven'} on it with lids on, oven to 475°F, at least ${BREAD_PREHEAT_MIN} minutes. ` +
-      (loaves > 1 ? 'Only one Dutch oven: put the second loaf in the fridge about 20 minutes before the first goes in, bake them one after the other, and give the pot a 5-minute reheat between loaves.' : ''),
+      (loaves === 2 ? 'Only one Dutch oven: put the second loaf in the fridge about 20 minutes before the first goes in, bake them one after the other, and give the pot a 5-minute reheat between loaves.' : '') +
+      // FWSY covers two loaves and one pot; treating every waiting loaf the same way is our assumption.
+      (loaves > 2 ? 'Fewer Dutch ovens than loaves: put the waiting loaves in the fridge about 20 minutes before the first goes in, bake them one after the other, and give each pot a 5-minute reheat between loaves. The book covers two loaves and one pot; doing the same for more loaves is an assumption.' : ''),
   });
 
   steps.push({

@@ -39,15 +39,32 @@ const PB_WARM = 'PizzaBlab, How to Cold Ferment Pizza Dough';
 const FWSY_BAKE = 'FWSY p.89: bake until at least medium dark brown, check after 15 minutes uncovered, rest at least 20 minutes';
 const FWSY_DENT = 'FWSY p.74: the finger-dent test';
 
+/** What the advice needs to know about the bake. A fridge rise has a fixed yeast amount and no warm-up setting. */
+export interface AdviceContext {
+  fridge?: boolean;
+}
+
 /** All suggestions in priority order. The first one is "the one change" for next time. */
-export function suggestions(s: Survey): Suggestion[] {
+export function suggestions(s: Survey, ctx: AdviceContext = {}): Suggestion[] {
   const out: Suggestion[] = [];
+  const fridge = !!ctx.fridge;
 
   // 1. Timing first: a dough that peaked early or late explains most handling problems.
+  // A fridge rise keeps its source yeast amount, so the advice points at the fridge time instead.
   if (s.ready === 'early') {
-    out.push({ area: 'timing', text: 'Dough ran ahead of schedule. Next time: less yeast, a cooler spot, or a shorter bulk.' });
+    out.push({
+      area: 'timing',
+      text: fridge
+        ? 'Dough ran ahead of schedule. Next time: a shorter fridge time, or a cooler spot once it’s out. The fridge yeast amount stays as it is.'
+        : 'Dough ran ahead of schedule. Next time: less yeast, a cooler spot, or a shorter bulk.',
+    });
   } else if (s.ready === 'late') {
-    out.push({ area: 'timing', text: 'Dough ran behind schedule. Next time: a warmer spot, a longer bulk, or a little more yeast.' });
+    out.push({
+      area: 'timing',
+      text: fridge
+        ? 'Dough ran behind schedule. Next time: a longer fridge time, or a warmer spot once it’s out. The fridge yeast amount stays as it is.'
+        : 'Dough ran behind schedule. Next time: a warmer spot, a longer bulk, or a little more yeast.',
+    });
   }
 
   // 2. Oven before dough for bake problems.
@@ -72,6 +89,8 @@ export function suggestions(s: Survey): Suggestion[] {
   if (s.stretch === 'tore') {
     if (s.ready === 'early') {
       out.push({ area: 'handling', text: 'Tearing after an early peak points to over-fermentation. Next time: shorten the ferment.' });
+    } else if (fridge) {
+      out.push({ area: 'handling', text: 'Tore while stretching. Next time: let the balls finish the full counter rest so they reach room temperature (Ooni).' });
     } else {
       out.push({
         area: 'handling',
@@ -82,7 +101,7 @@ export function suggestions(s: Survey): Suggestion[] {
   } else if (s.stretch === 'snapped') {
     out.push({
       area: 'handling',
-      text: 'Snapped back. When it resists, cover it and rest 15 minutes, then continue. A longer warm-up helps too.',
+      text: `Snapped back. When it resists, cover it and rest 15 minutes, then continue.${fridge ? '' : ' A longer warm-up helps too.'}`,
       source: KA_REST,
     });
   }
@@ -108,8 +127,8 @@ export function suggestions(s: Survey): Suggestion[] {
   return out;
 }
 
-export function topSuggestion(s: Survey): Suggestion | undefined {
-  return suggestions(s)[0];
+export function topSuggestion(s: Survey, ctx: AdviceContext = {}): Suggestion | undefined {
+  return suggestions(s, ctx)[0];
 }
 
 export interface ReadyTally {

@@ -1,6 +1,6 @@
 # FWSY bread recipes and levain notes
 
-Source: Ken Forkish, *Flour Water Salt Yeast*, from CJ's photos, 2026-11-13. Recipe figures are copied exactly as the book prints them, and the text is paraphrased. **Status: transcribed by Claude, not yet checked by CJ.** Nothing here goes into code until CJ has checked it.
+Source: Ken Forkish, *Flour Water Salt Yeast*, from CJ's photos, 2026-11-13. Recipe figures are copied exactly as the book prints them, and the text is paraphrased. **Status: Checked by CJ against the book, 2026-11-13.**
 
 Second pass (2026-11-13): every photo was re-read against these notes. One figure was wrong and is fixed: the Pain de Campagne levain volume is 1⅓ cups, not 1½. Missing details are added and marked "(2nd pass)". Overnight White's p.89 is confirmed by cross-references in the essay photos.
 

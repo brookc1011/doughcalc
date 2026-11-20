@@ -120,10 +120,10 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
   // Pizza fridge rise: Ooni, "Cold-proof pizza dough" (docs/sources/cold-proof.md).
   const foldCold = fold.replace(
     'It’s ready to divide at 2-3 times its starting size.',
-    'Then put the tub straight into the fridge (Ooni: the dough goes in as one mass). It comes out when it has roughly doubled.',
+    'Then put the tub straight into the fridge (Ooni: the dough goes in as one mass). The plan takes it out at the end of your fridge time; Ooni’s sign it’s ready is that it has roughly doubled.',
   );
   const ballCold =
-    'Take the tub out of the fridge; Ooni takes it out when the dough has roughly doubled. ' +
+    'Take the tub out of the fridge. It should have roughly doubled (Ooni); if not, it can stay in longer, up to Ooni’s 72 h, and the checklist re-times from when you tick it. ' +
     ball.replace(/ No cover needed while you shape\.$/, '') +
     ` Set them on a lightly floured tray with room between them, cover, and leave on the counter about ${PIZZA_COLD_REST_H} h, until they come to room temperature and double in size (Ooni).`;
 
@@ -171,7 +171,7 @@ export function fullStepText(a: StepAmounts, method: MixMethod, ddt: string, sta
   return {
     autolyse:
       `Measure ${g(find(t, 'water')?.grams ?? 0)} water at ${temp(a.water[0])}. Put ${yeastG(y?.grams ?? 0)} ${yeastName(y)} in a small cup with about 3 tbsp of that water${isActiveDry(y) ? ` warmed to ${ACTIVE_DRY_WATER} (active dry needs it warmer)` : ''} and set it aside. ` +
-      `Pour the rest of the water over ${g(find(t, 'flour')?.grams ?? 0)} flour in a 12-qt tub${method === 'mixer' ? ' or the mixer bowl' : ''} and mix by hand just until there’s no dry flour. Cover and rest 20-30 min.${ap}`,
+      `Pour the rest of the water over ${g(find(t, 'flour')?.grams ?? 0)} flour in a 12-qt tub${method === 'mixer' ? ' or the mixer bowl' : ''} and mix ${method === 'mixer' ? 'by hand or with the dough hook' : 'by hand'} just until there’s no dry flour. Cover and rest 20-30 min. Tap Done when the flour is mixed in: the rest starts then, and its timer counts it.${ap}`,
     mix: mixLine(
       method,
       `Sprinkle ${g(find(t, 'salt')?.grams ?? 0)} salt over the dough. Stir the yeast water with a finger and pour it over; wipe the cup with a pinch of dough and add that back.${mixExtras(t).text}`,
@@ -266,6 +266,7 @@ export function stepTimer(key: string, method: MixMethod, mixerMin = DEFAULT_MIX
       ? { kind: 'countdown', min: mixerMin, source: mixerMin === DEFAULT_MIXER_MIN ? MIXER_MIN_SOURCE : 'Your setting' }
       : { kind: 'stopwatch', note: 'Forkish gives no time for mixing by hand: mix until it is one mass.' };
   }
-  if (key === 'fold') return { kind: 'countdown', min: 30, source: 'King Arthur: about 30 minutes between folds' };
+  // CJ, 2026-11-20: the King Arthur page isn't in docs/sources yet, so the timer says it's an assumption.
+  if (key === 'fold') return { kind: 'countdown', min: 30, source: 'King Arthur: about 30 minutes between folds. Assumption until checked: that page isn’t in the app’s source notes yet.' };
   return undefined;
 }

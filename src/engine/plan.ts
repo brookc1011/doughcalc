@@ -136,6 +136,9 @@ function inputProblems(raw: PlanInput): Partial<Record<PlanField, string>> {
   return out;
 }
 
+/** Label for a figure cited to a book page that isn't copied into docs/sources yet (CJ, 2026-11-20). */
+export const UNCHECKED_PAGE = 'Assumption until checked: that page isn’t in the app’s source notes yet.';
+
 export function planBatch(raw: PlanInput): Plan {
   const fieldErrors = inputProblems(raw);
   const f = raw.formula;
@@ -204,6 +207,15 @@ export function planBatch(raw: PlanInput): Plan {
       note: `${OONI_SOURCE}. Ooni's dose for its own dough, used for this one as is.`,
     };
   }
+  // Pizza book pages (FWSY pp.218-221, 225-226) aren't transcribed in docs/sources yet (CJ, 2026-11-20:
+  // label them as assumptions until the page photos are copied in).
+  if (!bread && !pizzaCold && yeast.anchor && /FWSY/.test(yeast.anchor.source)) {
+    yeast = { ...yeast, note: `${yeast.note} ${UNCHECKED_PAGE}` };
+  }
+  // Between book times the amount is scaled, so it can jump when the plan moves onto a book time (CJ, 2026-11-20: note it, keep the math).
+  if (yeast.basis === 'estimate' && yeast.anchor) {
+    yeast = { ...yeast, note: `${yeast.note} The book amount applies only at the book's own time (${yeast.anchor.hours} h), so moving onto or off it can change the yeast in a step.` };
+  }
   // Ooni gives its own active dry figure, so it is used rather than converted from instant.
   const activeDryPct = pizzaCold && input.manualYeastPct === undefined ? OONI_ACTIVE_DRY_G / OONI_FLOUR_G : undefined;
   if (fitAnchor) {
@@ -219,8 +231,9 @@ export function planBatch(raw: PlanInput): Plan {
     yeastPct: yeast.pct,
     balls: input.balls,
     residuePct: input.residuePct,
-    yeastType: yeast.basis === 'manual' ? 'instant' : input.yeastType,
-    activeDryPct,
+    yeastType: input.yeastType,
+    // A typed amount is the yeast you're using: named by its type, never converted.
+    activeDryPct: yeast.basis === 'manual' ? yeast.pct : activeDryPct,
   });
   const water = waterTemps(f, input.roomF, input.temp);
   const amounts = { parts: recipe.parts, water, balls: input.balls, mixerMin: input.mixerMin, apFlour: input.apFlour };

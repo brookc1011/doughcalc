@@ -32,7 +32,7 @@ describe('help and attribution contracts', () => {
   // Must match what api.reminderItems actually sends (tests/reminders.test.ts checks that side).
   it('reminder privacy names everything the server holds, and what stays on the phone', () => {
     const t = HELP_COPY['reminder privacy'];
-    for (const s of ['notification address', 'random ID for this phone', 'its name, its time and the dough’s name']) {
+    for (const s of ['notification address', 'keys that let it send', 'random ID for this phone', 'an ID for this bake', 'its name, its time and the dough’s name', 'when to buzz']) {
       expect(t).toContain(s);
     }
     expect(t).toContain('Weights, notes, photos and ratings stay on your phone.');

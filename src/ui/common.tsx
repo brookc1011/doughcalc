@@ -65,7 +65,15 @@ type Recipe = Plan['recipe'];
 type Yeast = Plan['yeast'];
 type Water = Plan['water'];
 /** Keep edition-specific timing and any extra notes supplied by the engine. */
-export function StepDetail({ stepKey, detail }: { stepKey: string; detail: string }) {
+/** Step text is written in °F; with the °C setting, each temperature (or range) is shown in °C. */
+export function tempsIn(text: string, unit: 'F' | 'C' = 'F'): string {
+  if (unit === 'F') return text;
+  const c = (f: string) => String(Math.round(fToC(Number(f))));
+  return text.replace(/(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?°F/g, (_m, lo: string, hi?: string) => (hi ? `${c(lo)}-${c(hi)}°C` : `${c(lo)}°C`));
+}
+
+export function StepDetail({ stepKey, detail: raw, unit }: { stepKey: string; detail: string; unit?: 'F' | 'C' }) {
+  const detail = tempsIn(raw, unit);
   if (stepKey !== 'proofCheck') return <>{detail}</>;
   const cues = "Poke a loaf about ½ inch deep. Springs back at once: give it more time. Springs back slowly and not all the way: ready to bake. Doesn't spring back: overproofed.";
   if (!detail.includes(cues)) return <>{detail}</>;
@@ -116,7 +124,7 @@ export function RecipeView({ recipe, yeast, water, unit }: { recipe: Recipe; yea
   );
 }
 
-export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: string; onIcs: () => void }) {
+export function Timeline({ steps, title, onIcs, unit }: { steps: StepLike[]; title: string; onIcs: () => void; unit?: 'F' | 'C' }) {
   return (
     <section className="card">
       <div className="row between">
@@ -135,7 +143,7 @@ export function Timeline({ steps, title, onIcs }: { steps: StepLike[]; title: st
               </a>
             </div>
             <div className="step-time">{fmtWhen(s.at)}</div>
-            <div className="muted small"><StepDetail stepKey={s.key} detail={s.detail} /></div>
+            <div className="muted small"><StepDetail stepKey={s.key} detail={s.detail} unit={unit} /></div>
             {gapToNext(steps, i) && <div className="small step-gap">{gapToNext(steps, i)}</div>}
           </li>
         ))}
