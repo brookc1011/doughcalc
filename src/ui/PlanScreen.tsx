@@ -3,7 +3,6 @@ import { FLOUR_SOURCES, HELP_COPY } from './helpCopy';
 import { useEffect, useMemo, useState } from 'react';
 import {
   allDoughs, coldOk, lastDoughId, timingModes, type Product,
-  ballForDiameter,
   cloneDough,
   DEFAULT_EAT_HOUR,
   FLOUR_LABELS,
@@ -268,19 +267,11 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
           </button>
           <Info label="saved defaults">{bread ? 'Saves loaf sizes and bake time for this dough.' : HELP_COPY['saved defaults']}</Info>
         </div>
-        {!bread && <details className="size-options"><summary>Sizes & diameter</summary>
-        <p className="muted small">
-          “Set ball for size” changes the first line’s grams so a bigger or smaller pizza keeps the same thickness as{' '}
-          {formula.ballG} g on {formula.ballDiameterIn}".
-        </p>
-        <div className="row">
+        {!bread && <div className="row">
           <button className="small" onClick={() => setBalls([...balls, { count: 1, grams: 200, label: 'focaccia' }])}>
             + another size
           </button>
-          <SizeHelper formula={formula} onPick={(g) => setBall(0, { grams: Math.round(g) })} />
-        </div>
-
-        </details>}
+        </div>}
         {coldOk(formula) && <fieldset className="timing-group">
           <legend className="sr-only">Rise</legend>
           <div className="timing-help">
@@ -553,29 +544,5 @@ export function PlanScreen({ product, chooseProduct, settings, go, onSaved, repe
         {saving ? 'Saving your batch…' : 'Save bake plan'}
       </button></div>
     </div>
-  );
-}
-
-function SizeHelper({ formula, onPick }: { formula: Formula; onPick: (grams: number) => void }) {
-  const [d, setD] = useState('');
-  return (
-    <span className="row">
-      <input
-        type="number"
-        placeholder='size "'
-        value={d}
-        onChange={(e) => setD(e.target.value)}
-        aria-label="Pizza diameter in inches"
-        style={{ width: '5.5em' }}
-      />
-      <button
-        className="small"
-        disabled={!d}
-        onClick={() => onPick(ballForDiameter(formula.ballG, formula.ballDiameterIn, Number(d)))}
-        title={`Keeps the thickness of ${formula.ballG} g on ${formula.ballDiameterIn}"`}
-      >
-        Set ball for size
-      </button>
-    </span>
   );
 }

@@ -26,7 +26,9 @@ const same = (a?: Route, b?: Route) => !!a && !!b && JSON.stringify(a) === JSON.
 function fieldAndBarButton(target: EventTarget | null): HTMLElement | undefined {
   const field = document.activeElement;
   if (!(field instanceof HTMLElement) || !field.matches('input:not([type=file]), select, textarea')) return;
-  if (target instanceof Element && target.closest(':is(.plan-action, .editor-action, .batch-jumps, nav.tabs) button')
+  // Any button, not only the bars: when the field lets go, the bars move and the page shifts,
+  // so a button lower on the page (Create and edit, for one) slides out from under the finger.
+  if (target instanceof Element && target.closest('button')
       && window.matchMedia('(any-pointer: coarse)').matches) return field;
 }
 
@@ -111,7 +113,7 @@ export function App() {
   return (
     <div className="app"
       onMouseDownCapture={(event) => {
-        // On touch layouts, blurring a field moves these bars. Keep the pressed
+        // On touch layouts, blurring a field moves the bars and shifts the page. Keep the pressed
         // button under the pointer until click has a confirmed target.
         if (fieldAndBarButton(event.target)) event.preventDefault();
       }}

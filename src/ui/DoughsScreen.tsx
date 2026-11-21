@@ -18,12 +18,19 @@ import {
 import type { Route } from './App';
 import { KitchenMark, NumField } from './common';
 
+/** "Saved X" shown once on the dough list after the editor saves and goes back to it. */
+let savedNote = '';
+
 export function DoughsScreen({ product, fromPlan, go, onChange }: { product: Product; fromPlan?: boolean; go: (r: Route) => void; onChange: () => void }) {
   const [lib, setLib] = useState<DoughEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [baseId, setBaseId] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState('');
+  const [notice] = useState(() => savedNote);
+  useEffect(() => {
+    savedNote = '';
+  }, []);
 
   const load = () => (product === 'bread' ? doughLibrary(product) : doughLibrary()).then((l) => {
     setLib(l);
@@ -70,6 +77,7 @@ export function DoughsScreen({ product, fromPlan, go, onChange }: { product: Pro
       <h1>{product === 'bread' ? 'Bread doughs' : 'Pizza doughs'}</h1>
       <p className="intro">Edit what each dough starts with, add your own, or hide the ones you don’t use.</p>
 
+      {notice && <p className="fit-note" role="status">{notice}</p>}
       {error && (
         <p className="warn" role="alert">
           {error}
@@ -164,7 +172,6 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
   const [balls, setBalls] = useState<BallGroup[]>([]);
   const [eatHour, setEatHour] = useState(DEFAULT_EAT_HOUR);
   const [mixer, setMixer] = useState<'hand' | 'mixer' | ''>('');
-  const [saved, setSaved] = useState(false);
 
   const load = async () => {
     const e = (bread ? await doughLibrary(product) : await doughLibrary()).find((x) => x.formula.id === id) ?? null;
@@ -185,11 +192,9 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
 
   const patch = (p: Partial<Formula>) => {
     setF({ ...f, ...p });
-    setSaved(false);
   };
   const setBall = (i: number, p: Partial<BallGroup>) => {
     setBalls(balls.map((b, j) => (j === i ? { ...b, ...p } : b)));
-    setSaved(false);
   };
 
   const save = async () => {
@@ -199,9 +204,9 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
       defaults: { ...f.defaults, balls: balls.filter((b) => b.count > 0), eatHour, eatMinute: minute, mixer: mixer || undefined },
     };
     await saveDough(next);
-    await load();
-    setSaved(true);
+    savedNote = `Saved ${next.name}.`;
     onChange();
+    go({ name: 'doughs', fromPlan });
   };
 
   return (
@@ -240,8 +245,8 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
           {bread ? <input type="time" value={String(eatHour).padStart(2,'0') + ':' + String(minute).padStart(2,'0')} onChange={e => {
             if (!e.target.value) return;
             const [h,m] = e.target.value.split(':').map(Number);
-            setEatHour(h); setMinute(m); setSaved(false);
-          }} /> : <select value={eatHour} onChange={(e) => { setEatHour(Number(e.target.value)); setSaved(false); }}>
+            setEatHour(h); setMinute(m);
+          }} /> : <select value={eatHour} onChange={(e) => { setEatHour(Number(e.target.value)); }}>
             {Array.from({ length: 24 }, (_, h) => (
               <option key={h} value={h}>
                 {new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
@@ -251,7 +256,7 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
         </label>
         {!bread && <label>
           Mixing
-          <select value={mixer} onChange={(e) => { setMixer(e.target.value as 'hand' | 'mixer' | ''); setSaved(false); }}>
+          <select value={mixer} onChange={(e) => { setMixer(e.target.value as 'hand' | 'mixer' | ''); }}>
             <option value="">Same as last time</option>
             <option value="hand">By hand</option>
             <option value="mixer">Stand mixer</option>
@@ -285,18 +290,8 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
             <NumField value={pct(f.sugar)} onValue={(n) => patch({ sugar: n / 100 })} />
           </label>
         </div>
-        {!bread && <div className="row">
-          <label className="grow">
-            Reference ball (g)
-            <NumField value={f.ballG} onValue={(n) => patch({ ballG: n })} />
-          </label>
-          <label className="grow">
-            for a pizza of (in)
-            <NumField value={f.ballDiameterIn} onValue={(n) => patch({ ballDiameterIn: n })} />
-          </label>
-        </div>}
         <p className="muted small">
-          {!bread && 'The reference ball sets the thickness used by “Set ball for size” on the Plan screen. '}Yeast and timing come from:{' '}
+          Yeast and timing come from:{' '}
           {f.anchors.map((a) => a.source).join('; ')}.
           {book && ` Book recipe: ${fmtPct(book.hydration)} water, ${fmtPct(book.salt)} salt.`}
         </p>
@@ -307,7 +302,7 @@ export function DoughEditor({ product, fromPlan, id, go, onChange }: { product: 
       </section>
 
       <div className="editor-action"><button className="primary" onClick={save}>
-        {saved ? 'Saved' : 'Save dough'}
+        Save dough
       </button></div>
       {entry.kind === 'book' && entry.edited && (
         <button
